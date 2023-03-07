@@ -171,7 +171,7 @@ void insert_list(struct llist** head, char *opzione){
     struct llist *new= (llist *)malloc(sizeof(struct llist));
     new->next=NULL;
     int len= strlen(opzione)+1;
-    new->opzione=malloc(len* sizeof(char));
+    new->opzione=(char*)malloc(len* sizeof(char));
     struct llist *nodoCorrente= *head;
 
     strncpy(new->opzione,opzione,len);
@@ -257,6 +257,7 @@ void canc(llist** head){
     while(c>0){
         c=c-1;
         *head=cor->next;
+        free(cor->opzione);
         free(cor);
         cor=*head;
     }
@@ -451,7 +452,7 @@ void insert_file(file_structure** head,char* opzione, long num){
     new->value=-1;
     new->next=NULL;
     new->info=NULL;
-    file_structure *nodoCorrente;
+    struct file_structure *nodoCorrente;
 
     int len=strlen(opzione)+1;
     new->info=malloc(len* sizeof(char));
@@ -460,6 +461,7 @@ void insert_file(file_structure** head,char* opzione, long num){
     new->next=NULL;
     if((*head)==NULL) {
         *head = new;
+        return;
     }else{
         nodoCorrente=*head;
         while((nodoCorrente->next) != NULL){
