@@ -7,7 +7,7 @@ CFLAGS	= -lm -Wall -pedantic -g
 objects = farm.o
 objectsGeneraFile =generafile.o
 
-farm: farm.o auxiliaryMW.o workers.o list.o collector.o 
+farm: farm.o workers.o list.o collector.o 
 	$(CC) -pthread -o $@ $^
 	
 generafile: $(objectsGeneraFile)
@@ -16,14 +16,11 @@ generafile: $(objectsGeneraFile)
 collector.o: collector.c collector.h
 	$(CC) $(CFLAGS) -c $<
 
-farm.o: farm.c auxiliaryMW.h workers.h list.h
+farm.o: farm.c workers.h list.h
 	$(CC) $(CFLAGS) -c $< 
 	
 list.o: list.c list.h
 	$(CC) $(CFLAGS) -c $<
-	
-auxiliaryMW.o: auxiliaryMW.c auxiliaryMW.h list.h
-	$(CC) $(CFLAGS) -c $< 
 	
 workers.o: workers.c workers.h
 	$(CC) $(CFLAGS) -c $< 

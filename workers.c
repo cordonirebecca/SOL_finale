@@ -15,7 +15,6 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <sys/stat.h>
-#include "auxiliaryMW.h"
 #include <ctype.h>
 #include <limits.h>
 #include "list.h"
@@ -63,7 +62,6 @@ long sommatoria(char* file_name){
         free(tmp);
         i++;
     }
-
 
 
     /* chiude il file */

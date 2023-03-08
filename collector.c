@@ -5,20 +5,56 @@
 #include <pthread.h>
 #include "collector.h"
 #include "list.h"
-#include "auxiliaryMW.h"
 
 void cleanup() {
     unlink(SOCKNAME);
 }
 
-void* socket_collector(void *arg){ // il server non risponde al client
+//funzione di scambio a e b
+void swap(file_structure *a, file_structure *b){
+    long temp = a->value;
+    a->value = b->value;
+    b->value = temp;
+
+    char*aus = a->info;
+    a->info= b->info;
+    b->info = aus;
+}
+
+//bubble sort dei long
+void bubbleSort(file_structure *start){
+    int swapped;
+    struct file_structure *ptr1;
+    struct file_structure *lptr= NULL;
+
+    //controllo se lista == NULL
+    if (start == NULL)
+        return;
+
+    do{
+        swapped = 0;
+        ptr1 = start;
+
+        while (ptr1->next != lptr){
+            if (ptr1->value > ptr1->next->value){
+                swap(ptr1, ptr1->next);
+                swapped = 1;
+            }
+            ptr1 = ptr1->next;
+        }
+        lptr = ptr1;
+    }
+    while (swapped);
+}
+
+void* socket_collector(void *arg){
     struct sockaddr_un *serv_addr=((threadArgs_t*)arg)->serv_addr;
     int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
 
 
     // cancello il socket file se esiste
     cleanup();
-    // se qualcosa va storto ....
+    // se qualcosa non va
     atexit(cleanup);
 
     llist *List_to_stamp=malloc(sizeof(llist));
@@ -62,15 +98,10 @@ void* socket_collector(void *arg){ // il server non risponde al client
             //mi prendo solo i numeri della lista e li inserisco in una nuova lista
             List_to_order=split_file(List_to_stamp->next,List_to_order);
 
-            //printf("lista guardata:\n\n");
-            //print_file(List_to_order);
-            // printf("\n\n");
-
             //ordino la lista di int
             bubbleSort(List_to_order->next);
 
             print_file(List_to_order->next);
-            // printf("\n\n");
 
             break;
         }
@@ -86,7 +117,6 @@ void* socket_collector(void *arg){ // il server non risponde al client
 
     linked_list_destroy(List_to_stamp);
     file_list_destroy(List_to_order);
-
-    //printf("fine collector\n\n");
+    
     return NULL;
 }

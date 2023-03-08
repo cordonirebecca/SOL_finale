@@ -8,6 +8,7 @@
 #include <sys/un.h>
 #include <sys/socket.h>
 #define BUFSIZE 256
+#include "list.h"
 
 #define SYSCALL_EXIT(name, r, sc, str, ...)	\
     if ((r=sc) == -1) {				\
@@ -16,10 +17,8 @@
 	exit(errno_copy);			\
     }
 
-typedef struct COthreadArgs {
-    long connfd;
-    int lenght_tail_list;
-} COthreadArgs;
+
+void bubbleSort(file_structure *start);
 
 void cleanup();
 

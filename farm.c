@@ -12,7 +12,6 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <sys/stat.h>
-#include "auxiliaryMW.h"
 #include "workers.h"
 #define UNIX_PATH_MAX 256
 #include "list.h"
@@ -20,20 +19,8 @@
 #include "generafile.h"
 #include <signal.h>
 
-#define ec_meno1(s,m) \
-    if((s)==-1) {perror(m); exit(EXIT_FAILURE); \
-    }
 #define ec_null(s,m) \
-    if((s)==-1) {perror(m); exit(EXIT_FAILURE); \
-    }
-
-#define CHECKNULL(r,c,e) CHECK_EQ_EXIT(e, (r=c), NULL,e,"")
-
-#define CHECK_EQ_EXIT(name, X, val, str, ...)	\
-    if ((X)==val) {				\
-        perror(#name);				\
-	int errno_copy = errno;			\
-	exit(errno_copy);			\
+    if((s)== 0) {perror(m); exit(EXIT_FAILURE); \
     }
 
 // Global variables
@@ -90,7 +77,6 @@ void *Producer(void *arg) {
     llist *l=((threadArgs_t*)arg)->l;
     int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
     char *data;
-
 
     //l contiene tutti i file da inserire, è il list_to_insert del main
 
@@ -183,10 +169,7 @@ void *Consumer(void *arg) {
             strcat(path_socket,aus);
         }
 
-
-        //printf("PATH SOCKET: %s\n\n",path_socket);
         //alla strlen aggiungo il carattere terminatore
-        //printf("STRLEN: %ld\n\n", strlen(path_socket));
         int lungFile= strlen(path_socket)+1;
 
         ++consumed;
