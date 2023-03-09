@@ -10,15 +10,15 @@
 #define BUFSIZE 256
 #include "list.h"
 
-#define SYSCALL_EXIT(name, r, sc, str, ...)	\
-    if ((r=sc) == -1) {				\
-	perror(#name);				\
+#define SYSCALL_EXIT(func, var, call, str, ...)	\
+    if ((var=call) == -1) {				\
+	perror(#func);				\
 	int errno_copy = errno;			\
 	exit(errno_copy);			\
     }
 
 
-void bubbleSort(file_structure *start);
+void bubbleSort(file_structure *head);
 
 void cleanup();
 

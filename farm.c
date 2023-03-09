@@ -16,8 +16,6 @@
 #define UNIX_PATH_MAX 256
 #include "list.h"
 #include "collector.h"
-#include "generafile.h"
-#include <signal.h>
 
 #define ec_null(s,m) \
     if((s)== 0) {perror(m); exit(EXIT_FAILURE); \
@@ -147,7 +145,7 @@ void *Consumer(void *arg) {
                 //pulisco data togliendo S
                 removeChar(data,'S');
                 //uso la look_for_file per riportare nella lista l il percorso file
-                Look_for_file(data,directoryName,0,l);
+                Look_for_file(data,directoryName,l);
                 //pulisco tutta la lista lasciando solo l'ultimo elemento.
                 canc(&l); // mi rimane l'ultimo elemento da fare la free
                 strncpy(aus,l->opzione, strlen(l->opzione)+1);
@@ -181,7 +179,7 @@ void *Consumer(void *arg) {
         char buffer[BUFSIZE];
         memset(&buffer,'\0',sizeof(BUFSIZE));
 
-        if(termina_prima == 0){ // non ho ricevuto sigusr1
+        if(termina_prima == 0){ // non ho ricevuto sigusr1, non accetto più connessioni
             SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
 
             //apro una connessione per ogni worker
@@ -207,8 +205,6 @@ void *Consumer(void *arg) {
 
     return NULL;
 }
-
-
 
 //comandi del parser
 void *parser(int argc, char*argv[],llist **List_to_insert){
@@ -290,7 +286,7 @@ int main(int argc, char* argv []){
     }
 
 ///////////////////////////////////////////////////////////////////////////////////
-    int p=1,c=numberThreads;
+    int p=1,c=numberThreads; //il produttore è uno solo, il masterWorker
     pthread_t    *th;
     threadArgs_t *thARGS;
     pthread_t t1;
@@ -300,7 +296,7 @@ int main(int argc, char* argv []){
     serv_addr.sun_family = AF_UNIX;
 
     //Listdir apre tutte le cartelle e inserisce i file nella lista
-    listdir(directoryName,0,List_to_insert);//aggiunge i file nelle directories
+    listdir(directoryName,List_to_insert);//aggiunge i file nelle directories
 
 
     //conto il numero degli argomenti
@@ -329,7 +325,6 @@ int main(int argc, char* argv []){
         thARGS[i].lenght_tail_list=lenght_of_list;
     }
 
-
     //argomenti per consumatore
     for(int i=p;i<(p+c); ++i) {
         thARGS[i].thid = i-p;
@@ -349,7 +344,7 @@ int main(int argc, char* argv []){
         //ignoro tutti i segnali gestiti dal MasterWorker
         struct sigaction s;
         memset(&s, 0, sizeof(s)); //azzero s
-        s.sa_handler = SIG_IGN;
+        s.sa_handler = SIG_IGN; //ignoro tutti i isegnali
         s.sa_flags = SA_RESTART; // per non interrompere le sistem call
 
         sigaction(SIGINT,&s,NULL);
@@ -369,6 +364,8 @@ int main(int argc, char* argv []){
         }
 
         pthread_join(t1,NULL);//collector
+
+        //libero memoria usata
         linked_list_destroy(List_to_insert);
         deleteQueue(q);
         free(th);
@@ -406,19 +403,15 @@ int main(int argc, char* argv []){
         }
 
 
-        List_to_insert=NULL;
-        linked_list_destroy(List_to_insert);
-        //print_list(List_to_insert);
+        //libero memoria usata
         deleteQueue(q);
         free(th);
         free(thARGS);
-
     }
 
     //mando segnale di sigterm per terminare
     pthread_kill(sighandler_thread,SIGTERM);
     pthread_join(sighandler_thread,NULL);
-
 
     return 0;
 }

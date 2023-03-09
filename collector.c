@@ -12,37 +12,37 @@ void cleanup() {
 
 //funzione di scambio a e b
 void swap(file_structure *a, file_structure *b){
-    long temp = a->value;
+    long temp = a->value; // inverto i long
     a->value = b->value;
     b->value = temp;
 
-    char*aus = a->info;
+    char*aus = a->info;//inverto i char
     a->info= b->info;
     b->info = aus;
 }
 
 //bubble sort dei long
-void bubbleSort(file_structure *start){
+void bubbleSort(file_structure *head){
     int swapped;
-    struct file_structure *ptr1;
-    struct file_structure *lptr= NULL;
+    struct file_structure *cor;
+    struct file_structure *prec= NULL;
 
     //controllo se lista == NULL
-    if (start == NULL)
+    if (head == NULL)
         return;
 
     do{
         swapped = 0;
-        ptr1 = start;
+        cor = head;
 
-        while (ptr1->next != lptr){
-            if (ptr1->value > ptr1->next->value){
-                swap(ptr1, ptr1->next);
+        while (cor->next != prec){
+            if (cor->value > cor->next->value){
+                swap(cor, cor->next);
                 swapped = 1;
             }
-            ptr1 = ptr1->next;
+            cor = cor->next;
         }
-        lptr = ptr1;
+        prec = cor;
     }
     while (swapped);
 }
@@ -57,14 +57,8 @@ void* socket_collector(void *arg){
     // se qualcosa non va
     atexit(cleanup);
 
-    llist *List_to_stamp=malloc(sizeof(llist));
-    List_to_stamp->next = NULL;
-    List_to_stamp->opzione = NULL;
-
-    file_structure *List_to_order= malloc(sizeof(file_structure));
-    List_to_order->next=NULL;
-    List_to_order->info=NULL;
-    List_to_order->value=0;
+    llist *List_to_stamp = NULL;
+    file_structure *List_to_order= NULL;
 
     int listenfd=0;
     // creo il socket
@@ -84,31 +78,44 @@ void* socket_collector(void *arg){
     do {
         connfd=accept(listenfd, (struct sockaddr*)NULL ,NULL);
         read(connfd,buffer,BUFSIZE);
-        //printf("\n\ncollector got: %s\n\n",buffer);
-        insert_list(&List_to_stamp,buffer);
 
-        //write(connfd,"received",9);
-        //close(listenfd);
-        //printf("connection done [%d]\n", counter);
-        counter++;
-        help ++;
-        if(help == lenght_tail_list){ // numero di argomenti che ho
-            //ordino gli elementi in modo crescente
+        if( strcmp(buffer,"STOP")==0){ // ho ricevuto Sigusr1 mi fermo e stampo solo quello che ho ricevuto
+            insert_list(&List_to_stamp,buffer);
 
-            //mi prendo solo i numeri della lista e li inserisco in una nuova lista
-            List_to_order=split_file(List_to_stamp->next,List_to_order);
+            List_to_order=split_file(List_to_stamp,List_to_order);
 
             //ordino la lista di int
-            bubbleSort(List_to_order->next);
+            bubbleSort(List_to_order);
 
-            print_file(List_to_order->next);
+            //stampo lista finale e inetrrompo il ciclo
+            print_file(List_to_order);
 
-            break;
-        }
-
-        if( strcmp(buffer,"STOP")==0){
             //printf("ricevuto il segnale nel collector, mi fermo \n\n");
             break;
+        }
+        else{ // non ho ricevuto sigusr1
+            //printf("\n\ncollector got: %s\n\n",buffer);
+            //inserisco gli elementi arriavti in list_to_stamp
+            insert_list(&List_to_stamp,buffer);
+
+            //write(connfd,"received",9);
+            //close(listenfd);
+            //printf("connection done [%d]\n", counter);
+            counter++;
+            help ++;
+            if(help == lenght_tail_list){ // numero totale di file che ho in input
+                //ordino gli elementi in modo crescente
+
+                //mi prendo solo i numeri della lista e li inserisco in una nuova lista
+                List_to_order=split_file(List_to_stamp,List_to_order);
+
+                //ordino la lista di int
+                bubbleSort(List_to_order);
+
+                //stampo lista finale e inetrrompo il ciclo
+                print_file(List_to_order);
+                break;
+            }
         }
 
         close(connfd);
@@ -117,6 +124,6 @@ void* socket_collector(void *arg){
 
     linked_list_destroy(List_to_stamp);
     file_list_destroy(List_to_order);
-    
+
     return NULL;
 }

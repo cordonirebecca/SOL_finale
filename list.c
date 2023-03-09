@@ -19,9 +19,13 @@ static inline void freeNode(llist *node)           { free((void*)node); }
 
 Queue_t *initQueue() {
     Queue_t *q = malloc(sizeof(Queue_t));
-    if (!q) return NULL;
+    if (!q) {
+        return NULL;
+    }
     q->head = malloc(sizeof(llist));
-    if (!q->head) return NULL;
+    if (!q->head) {
+        return NULL;
+    }
     q->head->opzione = NULL;
     q->head->next = NULL;
     q->tail = q->head;
@@ -42,7 +46,6 @@ void deleteQueue(Queue_t *q) {
     while(q->head != q->tail) {
         llist *p = (llist*)q->head;
         q->head = q->head->next;
-
         freeNode(p);
     }
     if (q->head) freeNode((void*)q->head);
@@ -149,7 +152,7 @@ void delete_head_lista_piena(struct llist** head,char* data){
 }
 
 //funzione che apre tutte le cartelle e mi stampa i file in ognuna
-void listdir(const char *name, int indent,struct llist *l){
+void listdir(const char *name,struct llist *l){
     DIR *dir;
     struct dirent *entry;
     if (!(dir = opendir(name)))
@@ -164,7 +167,7 @@ void listdir(const char *name, int indent,struct llist *l){
             snprintf(path, sizeof(path), "%s/%s", name, entry->d_name);
             //printf("PATH: %s\n\n",entry->d_name);
             //printf("%*s[%s]\n", indent, "", entry->d_name);
-            listdir(path, indent + 2,l);
+            listdir(path,l);
         } else {
             // sono uno o più file nella directory
             //printf("%*s- %s\n", indent, "", entry->d_name);
@@ -177,7 +180,7 @@ void listdir(const char *name, int indent,struct llist *l){
 
 //ritorno il path di un determinato file inserendolo nella lista l
 //aggiorno data che è il file.txt
-void Look_for_file(char* filename, char* directorydipartenza, int indent,struct llist*l){
+void Look_for_file(char* filename, char* directorydipartenza,struct llist*l){
     DIR *dir;
     struct dirent *entry;
     if (!(dir = opendir(directorydipartenza))){
@@ -191,7 +194,7 @@ void Look_for_file(char* filename, char* directorydipartenza, int indent,struct 
                 continue;
             }
             snprintf(path, sizeof(path), "%s/%s", directorydipartenza, entry->d_name);
-            Look_for_file(filename,path, indent + 2,l);
+            Look_for_file(filename,path,l);
         } else {
             if((strcmp(entry->d_name,filename))==0){
                 if(directorydipartenza !=NULL){
@@ -281,15 +284,14 @@ void add_list_flag(struct llist** head, char * opzione,char* var){
     nodoCorrente->next=new;
 }
 
-int listLength(llist *item){
-    llist * cur = item;
+int listLength(llist *head){
+    llist * cur = head;
     int size = 0;
 
     while (cur != NULL){
         ++size;
         cur = cur->next;
     }
-
     return size;
 }
 
@@ -303,7 +305,6 @@ void print_list(struct llist* head){
         printf("\n");
         aus = aus->next;
     }
-    printf("NULL");
 }
 
 void linked_list_destroy(llist *head){
@@ -415,8 +416,6 @@ void file_list_destroy(file_structure *head){
         free(tmp);
     }
 }
-
-
 
 void removeChar(char * str, char charToRemmove){
     int i, j;
