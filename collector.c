@@ -80,7 +80,7 @@ void* socket_collector(void *arg){
         read(connfd,buffer,BUFSIZE);
 
         if( strcmp(buffer,"STOP")==0){ // ho ricevuto Sigusr1 mi fermo e stampo solo quello che ho ricevuto
-            insert_list(&List_to_stamp,buffer);
+            //insert_list(&List_to_stamp,buffer);
 
             List_to_order=split_file(List_to_stamp,List_to_order);
 
@@ -91,10 +91,11 @@ void* socket_collector(void *arg){
             print_file(List_to_order);
 
             //printf("ricevuto il segnale nel collector, mi fermo \n\n");
-            break;
+
         }
         else{ // non ho ricevuto sigusr1
             //printf("\n\ncollector got: %s\n\n",buffer);
+
             //inserisco gli elementi arriavti in list_to_stamp
             insert_list(&List_to_stamp,buffer);
 

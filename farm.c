@@ -71,6 +71,7 @@ static void *sigHandler_func(void *arg) {
 // funzione eseguita dal thread produttore
 void *Producer(void *arg) {
     Queue_t *q  = ((threadArgs_t*)arg)->q;
+    int *t = ((threadArgs_t*)arg)->tempo_di_invio;
     // int   myid  = ((threadArgs_t*)arg)->thid;
     llist *l=((threadArgs_t*)arg)->l;
     int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
@@ -79,10 +80,11 @@ void *Producer(void *arg) {
     //l contiene tutti i file da inserire, è il list_to_insert del main
 
     for(int i=0;i<lenght_tail_list; ++i) {
-        if(termina == 0){ // inserisco tutto traquillamente
+        if(termina == 0){ // inserisco tutto tranquillamente
             //estraggo una alla volta i data dalla lista e li inserisco in modo concorrente in q
             data=l->opzione;
-            //printf("DATA [%d]: %s\n\n",i,data);
+            printf("DATA [%d]: %s\n\n",i,data);
+            sleep(t);
             if (push(q, data) == -1) {
                 fprintf(stderr, "Errore: push\n");
                 free(data);
@@ -92,8 +94,9 @@ void *Producer(void *arg) {
             delete_head_lista_piena(&l,data); //libero la lista piano piano
         }
         else{ //è arrivato un segnale come sigint, smetto di inserire i dati e faccio finire quelli di prima
+            sleep(1);
             push(q,"STOP");
-            free(data);
+           // free(data);
         }
         //printf("Producer %d pushed <%d>\n", myid, i);
     }
@@ -122,14 +125,14 @@ void *Consumer(void *arg) {
         char* data= NULL;
         //la funzione dequeue mi restituisce il primo elemento della lista con i file
         data = dequeue(q);
-       // printf("DATA: %s\n\n",data);
+        //printf("DATA IN WORKER: %s\n\n",data);
         assert(data);
         if (strcmp(data,"fine")== 0) {
             // free(data);
             //printf("entro nel break\n");
             break;
         }
-        if(strcmp(data,"STOP")== 0 ){ //stampo quello che ho mandato e basta
+        if(strcmp(data,"STOP")== 0 ){ //stampo quello che ho ricevuto fino a quel momento
             if(unavolta == 0){
                 strncpy(path_socket,"STOP",5);
                 //printf("path socket : %s\n\n",path_socket);
@@ -195,7 +198,7 @@ void *Consumer(void *arg) {
             read(sockfd,buffer,BUFSIZE);
         }
         counter++;
-        free(data);
+        //free(data);
     }while(1);
 
     close(sockfd);
@@ -323,6 +326,7 @@ int main(int argc, char* argv []){
         thARGS[i].l = List_to_insert;
         thARGS[i].serv_addr = &serv_addr;
         thARGS[i].lenght_tail_list=lenght_of_list;
+        thARGS[i].tempo_di_invio=tempo;
     }
 
     //argomenti per consumatore
