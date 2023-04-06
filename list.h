@@ -37,6 +37,7 @@ typedef struct threadArgs {
     llist *l;
     struct sockaddr_un *serv_addr;
     int lenght_tail_list;
+    int tempo_di_invio;
 } threadArgs_t;
 
 //funzioni gestione coda q

@@ -33,6 +33,13 @@ llist *List_to_insert;
 int termina=0;
 int termina_prima= 0;
 
+
+typedef struct{
+    llist *lista;
+}DATA;
+
+DATA risultato_da_inviare;
+
 // funzione eseguita dal signal handler thread
 static void *sigHandler_func(void *arg) {
     // printf("\nnel sigHandler_func\n\n");
@@ -71,7 +78,7 @@ static void *sigHandler_func(void *arg) {
 // funzione eseguita dal thread produttore
 void *Producer(void *arg) {
     Queue_t *q  = ((threadArgs_t*)arg)->q;
-    int *t = ((threadArgs_t*)arg)->tempo_di_invio;
+    int t = ((threadArgs_t*)arg)->tempo_di_invio;
     // int   myid  = ((threadArgs_t*)arg)->thid;
     llist *l=((threadArgs_t*)arg)->l;
     int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
@@ -83,7 +90,7 @@ void *Producer(void *arg) {
         if(termina == 0){ // inserisco tutto tranquillamente
             //estraggo una alla volta i data dalla lista e li inserisco in modo concorrente in q
             data=l->opzione;
-            printf("DATA [%d]: %s\n\n",i,data);
+           // printf("DATA [%d]: %s\n\n",i,data);
             sleep(t);
             if (push(q, data) == -1) {
                 fprintf(stderr, "Errore: push\n");
@@ -108,7 +115,6 @@ void *Producer(void *arg) {
 void *Consumer(void *arg) {
     Queue_t *q  = ((threadArgs_t*)arg)->q;
     //  int   myid  = ((threadArgs_t*)arg)->thid;
-    struct sockaddr_un *serv_addr=((threadArgs_t*)arg)->serv_addr;
 
     char *path_socket=malloc(sizeof(char)*(UNIX_PATH_MAX));
     char *aus=malloc(sizeof(char )*(UNIX_PATH_MAX));
@@ -118,9 +124,8 @@ void *Consumer(void *arg) {
 
     long sommatoria_risultato=0;
     size_t consumed=0;
-    int sockfd=0;
-    int counter=0;
     int unavolta=0;
+
     do {
         char* data= NULL;
         //la funzione dequeue mi restituisce il primo elemento della lista con i file
@@ -170,38 +175,15 @@ void *Consumer(void *arg) {
             strcat(path_socket,aus);
         }
 
-        //alla strlen aggiungo il carattere terminatore
-        int lungFile= strlen(path_socket)+1;
-
         ++consumed;
         //printf("Consumer %d: estratto <%s>\n", myid, data);
 
+        insert_list(&risultato_da_inviare.lista,path_socket);
 
-        //qui va inviato il messaggio path_socket
-        //apro socket e invio
-        char buffer[BUFSIZE];
-        memset(&buffer,'\0',sizeof(BUFSIZE));
-
-        if(termina_prima == 0){ // non ho ricevuto sigusr1, non accetto più connessioni
-            SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
-
-            //apro una connessione per ogni worker
-            connect(sockfd, (struct sockaddr*)serv_addr, sizeof(*serv_addr));
-
-            write(sockfd,path_socket,lungFile);
-            //read(sockfd,buffer,BUFSIZE);
-            //printf("worker got: %s\n\n",buffer);
-        }else{ // se ho ricevuto sigusr1 mando parola stop per terminare
-            SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
-            strncpy(buffer,"STOP",5);
-            write(sockfd,path_socket,BUFSIZE);
-            read(sockfd,buffer,BUFSIZE);
-        }
-        counter++;
         //free(data);
     }while(1);
 
-    close(sockfd);
+    //close(sockfd);
     free(path_socket);
     free(aus);
     linked_list_destroy(l);
@@ -249,8 +231,11 @@ void *parser(int argc, char*argv[],llist **List_to_insert){
 int main(int argc, char* argv []){
 
     llist *List_to_insert=NULL;
+    llist *List_to_send=NULL;
     // gestione parser
     parser(argc, argv, &List_to_insert);  //list_to_insert contiene i file che erano nella riga di comando
+
+    risultato_da_inviare.lista=NULL;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     sigset_t     mask;
@@ -294,6 +279,7 @@ int main(int argc, char* argv []){
     threadArgs_t *thARGS;
     pthread_t t1;
     struct sockaddr_un serv_addr;
+    int sockfd;
     memset(&serv_addr, '0', sizeof(serv_addr));
     strncpy(serv_addr.sun_path, SOCKNAME, strlen(SOCKNAME)+1);
     serv_addr.sun_family = AF_UNIX;
@@ -324,8 +310,8 @@ int main(int argc, char* argv []){
         thARGS[i].thid = i;
         thARGS[i].q    = q;
         thARGS[i].l = List_to_insert;
-        thARGS[i].serv_addr = &serv_addr;
         thARGS[i].lenght_tail_list=lenght_of_list;
+        thARGS[i].serv_addr = &serv_addr;
         thARGS[i].tempo_di_invio=tempo;
     }
 
@@ -333,8 +319,9 @@ int main(int argc, char* argv []){
     for(int i=p;i<(p+c); ++i) {
         thARGS[i].thid = i-p;
         thARGS[i].q    = q;
-        thARGS[i].serv_addr = &serv_addr;
         thARGS[i].lenght_tail_list=lenght_of_list;
+        thARGS[i].serv_addr = &serv_addr;
+        thARGS[i].l = List_to_send;
     }
 
     pid_t process_id = fork(); //creo collector, processo figlio del masterWorker
@@ -393,11 +380,9 @@ int main(int argc, char* argv []){
         for(int i=0;i<p; ++i)
             pthread_join(th[i], NULL);
 
-
         // quindi termino tutti i consumatori/workers
         for(int i=0;i<c; ++i) {
             push(q, "fine");
-            //printf("sono dentro il terminatore\n\n");
         }
 
 
@@ -406,6 +391,29 @@ int main(int argc, char* argv []){
             pthread_join(th[p+i], NULL);
         }
 
+        char buffer[BUFSIZE];
+        SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
+        int notused;
+        SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
+
+       //invio il numero di file che arriveranno al collector
+        int lungh_lista=listLength(risultato_da_inviare.lista);
+
+        //trasformiamo int in char
+        char* charValue= malloc(sizeof (char));
+        sprintf(charValue,"%d",lungh_lista);
+
+        //inviamo la lunghezza della lista al collector
+        write(sockfd,charValue, strlen(charValue)+1);
+        sleep(1);
+
+        //invio tutti i file al collector
+        for(int indice=0; indice<lungh_lista;indice++){
+            write(sockfd,risultato_da_inviare.lista->opzione, strlen(risultato_da_inviare.lista->opzione)+1);
+            risultato_da_inviare.lista=risultato_da_inviare.lista->next;
+            sleep(0.3);
+        }
+        close(sockfd);
 
         //libero memoria usata
         deleteQueue(q);
