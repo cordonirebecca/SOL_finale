@@ -49,11 +49,9 @@ void bubbleSort(file_structure *head){
 
 void* socket_collector(void *arg){
     struct sockaddr_un *serv_addr=((threadArgs_t*)arg)->serv_addr;
-    int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
 
     llist *lista_ricevente = NULL;
     file_structure *List_to_order= NULL;
-    llist *List_to_stamp = NULL;
 
     // cancello il socket file se esiste
     cleanup();
@@ -74,19 +72,22 @@ void* socket_collector(void *arg){
     int connfd;
 
     SYSCALL_EXIT("accept", connfd, accept(listenfd, (struct sockaddr*)NULL ,NULL), "accept","");
+
     //ricevo lunghezza della lista
     read(connfd,buffer,BUFSIZE);
     //converto il char ricevuto in int
     int lungh_lista=atoi(buffer);
 
-    for(int indice =0; indice<lungh_lista;indice++){
+    for(int indice = 0; indice<lungh_lista; indice++){
         read(connfd,buffer2,BUFSIZE);
+       // printf("\nFILE RCV: %s\n",buffer2);
         //inserisco nella lista tutti i file ricevuti
-        insert_list(&lista_ricevente,buffer2);
+        if(strcmp(buffer2,"STOP") != 0){
+            insert_list(&lista_ricevente,buffer2);
+        }
     }
 
-    //print_list(lista_ricevente);
-
+    close(connfd);
     List_to_order=split_file(lista_ricevente,List_to_order);
 
     //ordino la lista di int
@@ -95,5 +96,9 @@ void* socket_collector(void *arg){
     //stampo lista finale e inetrrompo il ciclo
     print_file(List_to_order);
 
-    close(connfd);
+    linked_list_destroy(lista_ricevente);
+    file_list_destroy(List_to_order);
+
+  //  printf("fine collector\n\n");
+    return NULL;
 }

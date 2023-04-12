@@ -91,7 +91,7 @@ void *Producer(void *arg) {
             //estraggo una alla volta i data dalla lista e li inserisco in modo concorrente in q
             data=l->opzione;
            // printf("DATA [%d]: %s\n\n",i,data);
-            sleep(t);
+            sleep(t/1000);
             if (push(q, data) == -1) {
                 fprintf(stderr, "Errore: push\n");
                 free(data);
@@ -100,7 +100,7 @@ void *Producer(void *arg) {
             //elimino primo elemento dalla lista
             delete_head_lista_piena(&l,data); //libero la lista piano piano
         }
-        else{ //è arrivato un segnale come sigint, smetto di inserire i dati e faccio finire quelli di prima
+        else{ //è arrivato un segnale come sigint, smetto di inserire i dati e faccio finire quelli che erano in coda
             sleep(1);
             push(q,"STOP");
            // free(data);
@@ -179,8 +179,6 @@ void *Consumer(void *arg) {
         //printf("Consumer %d: estratto <%s>\n", myid, data);
 
         insert_list(&risultato_da_inviare.lista,path_socket);
-
-        //free(data);
     }while(1);
 
     //close(sockfd);
@@ -267,11 +265,6 @@ int main(int argc, char* argv []){
         abort();
     }
 
-    // un loop creato per mandare i segnali e provarli
-    while(1){
-        sleep(3);
-        break;
-    }
 
 ///////////////////////////////////////////////////////////////////////////////////
     int p=1,c=numberThreads; //il produttore è uno solo, il masterWorker
@@ -354,6 +347,8 @@ int main(int argc, char* argv []){
             }
         }
 
+      //  printf("fine collector nel main \n\n");
+
         pthread_join(t1,NULL);//collector
 
         //libero memoria usata
@@ -385,13 +380,13 @@ int main(int argc, char* argv []){
             push(q, "fine");
         }
 
-
         // aspetto la terminazione di tutti i consumatori
         for(int i=0;i<c; ++i){
             pthread_join(th[p+i], NULL);
         }
 
-        char buffer[BUFSIZE];
+        //print_list(risultato_da_inviare.lista);
+
         SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
         int notused;
         SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
@@ -407,23 +402,30 @@ int main(int argc, char* argv []){
         write(sockfd,charValue, strlen(charValue)+1);
         sleep(1);
 
+
         //invio tutti i file al collector
         for(int indice=0; indice<lungh_lista;indice++){
             write(sockfd,risultato_da_inviare.lista->opzione, strlen(risultato_da_inviare.lista->opzione)+1);
+           // printf("FILE SEND: %s\n",risultato_da_inviare.lista->opzione);
+            sleep(1);
             risultato_da_inviare.lista=risultato_da_inviare.lista->next;
-            sleep(0.3);
         }
+
         close(sockfd);
 
         //libero memoria usata
+        free(charValue);
         deleteQueue(q);
         free(th);
         free(thARGS);
     }
 
-    //mando segnale di sigterm per terminare
+
     pthread_kill(sighandler_thread,SIGTERM);
     pthread_join(sighandler_thread,NULL);
 
+    linked_list_destroy(risultato_da_inviare.lista);
+
+   // printf("fine main\n\n");
     return 0;
 }
