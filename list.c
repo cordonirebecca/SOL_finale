@@ -209,7 +209,7 @@ void Look_for_file(char* filename, char* directorydipartenza,struct llist*l){
 }
 
 void insert_list(struct llist** head, char *opzione){
-    struct llist *new= (llist *)malloc(sizeof(struct llist));
+    struct llist *new= (llist *)malloc(sizeof(llist));
     new->next=NULL;
     int len= strlen(opzione)+1;
     new->opzione=(char*)malloc(len* sizeof(char));
@@ -433,3 +433,4 @@ void removeChar(char * str, char charToRemmove){
         }
     }
 }
+

@@ -34,7 +34,7 @@ int termina=0;
 int termina_prima= 0;
 
 
-typedef struct{
+typedef struct DATA {
     llist *lista;
 }DATA;
 
@@ -103,7 +103,6 @@ void *Producer(void *arg) {
         else{ //è arrivato un segnale come sigint, smetto di inserire i dati e faccio finire quelli che erano in coda
             sleep(1);
             push(q,"STOP");
-           // free(data);
         }
         //printf("Producer %d pushed <%d>\n", myid, i);
     }
@@ -177,11 +176,10 @@ void *Consumer(void *arg) {
 
         ++consumed;
         //printf("Consumer %d: estratto <%s>\n", myid, data);
-
         insert_list(&risultato_da_inviare.lista,path_socket);
+
     }while(1);
 
-    //close(sockfd);
     free(path_socket);
     free(aus);
     linked_list_destroy(l);
@@ -233,7 +231,7 @@ int main(int argc, char* argv []){
     // gestione parser
     parser(argc, argv, &List_to_insert);  //list_to_insert contiene i file che erano nella riga di comando
 
-    risultato_da_inviare.lista=NULL;
+    risultato_da_inviare.lista=NULL; //inizializzo la lista che poi avrà tutti i file
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     sigset_t     mask;
@@ -279,7 +277,6 @@ int main(int argc, char* argv []){
 
     //Listdir apre tutte le cartelle e inserisce i file nella lista
     listdir(directoryName,List_to_insert);//aggiunge i file nelle directories
-
 
     //conto il numero degli argomenti
     int lenght_of_list= listLength(List_to_insert);
@@ -353,6 +350,7 @@ int main(int argc, char* argv []){
 
         //libero memoria usata
         linked_list_destroy(List_to_insert);
+        linked_list_destroy(risultato_da_inviare.lista);
         deleteQueue(q);
         free(th);
         free(thARGS);
@@ -395,7 +393,7 @@ int main(int argc, char* argv []){
         int lungh_lista=listLength(risultato_da_inviare.lista);
 
         //trasformiamo int in char
-        char* charValue= malloc(sizeof (char));
+        char* charValue= malloc(sizeof (char)*(UNIX_PATH_MAX));
         sprintf(charValue,"%d",lungh_lista);
 
         //inviamo la lunghezza della lista al collector
@@ -415,6 +413,7 @@ int main(int argc, char* argv []){
 
         //libero memoria usata
         free(charValue);
+        linked_list_destroy(risultato_da_inviare.lista);
         deleteQueue(q);
         free(th);
         free(thARGS);
@@ -423,8 +422,6 @@ int main(int argc, char* argv []){
 
     pthread_kill(sighandler_thread,SIGTERM);
     pthread_join(sighandler_thread,NULL);
-
-    linked_list_destroy(risultato_da_inviare.lista);
 
    // printf("fine main\n\n");
     return 0;
