@@ -12,6 +12,10 @@ typedef struct llist{
     struct llist *next;
 } llist;
 
+typedef struct DATA {
+    llist *lista;
+}DATA;
+
 typedef struct Queue {
     llist       *head;
     llist       *tail;
@@ -99,5 +103,7 @@ void print_file(file_structure* head);
 void file_list_destroy(file_structure *head);
 
 void removeChar(char * str, char charToRemmove);
+
+void deleteData(DATA *element);
 
 #endif //SOL_LIST_H

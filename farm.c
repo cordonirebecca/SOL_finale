@@ -32,13 +32,7 @@ int i=0;
 llist *List_to_insert;
 int termina=0;
 int termina_prima= 0;
-
-
-typedef struct DATA {
-    llist *lista;
-}DATA;
-
-DATA risultato_da_inviare;
+DATA *risultato_da_inviare;
 
 // funzione eseguita dal signal handler thread
 static void *sigHandler_func(void *arg) {
@@ -60,7 +54,7 @@ static void *sigHandler_func(void *arg) {
             case SIGTERM:
             case SIGQUIT:
                 termina = 1;
-                //printf("segnale modificato: %d\n",termina);
+                printf("segnale modificato: %d\n",termina);
 
                 return NULL;
             case SIGUSR1:
@@ -90,7 +84,7 @@ void *Producer(void *arg) {
         if(termina == 0){ // inserisco tutto tranquillamente
             //estraggo una alla volta i data dalla lista e li inserisco in modo concorrente in q
             data=l->opzione;
-           // printf("DATA [%d]: %s\n\n",i,data);
+            printf("DATA [%d]: %s\n\n",i,data);
             sleep(t/1000);
             if (push(q, data) == -1) {
                 fprintf(stderr, "Errore: push\n");
@@ -176,7 +170,8 @@ void *Consumer(void *arg) {
 
         ++consumed;
         //printf("Consumer %d: estratto <%s>\n", myid, data);
-        insert_list(&risultato_da_inviare.lista,path_socket);
+        insert_list(&risultato_da_inviare->lista,path_socket);
+       // print_list(risultato_da_inviare->lista);
 
     }while(1);
 
@@ -231,7 +226,13 @@ int main(int argc, char* argv []){
     // gestione parser
     parser(argc, argv, &List_to_insert);  //list_to_insert contiene i file che erano nella riga di comando
 
-    risultato_da_inviare.lista=NULL; //inizializzo la lista che poi avrà tutti i file
+    risultato_da_inviare = malloc(sizeof (DATA));
+    if(!risultato_da_inviare){
+        fprintf(stderr, "malloc risultato_da_inviare fallita\n");
+        exit(errno);
+    }
+    risultato_da_inviare->lista=NULL;
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     sigset_t     mask;
@@ -350,7 +351,6 @@ int main(int argc, char* argv []){
 
         //libero memoria usata
         linked_list_destroy(List_to_insert);
-        linked_list_destroy(risultato_da_inviare.lista);
         deleteQueue(q);
         free(th);
         free(thARGS);
@@ -390,7 +390,7 @@ int main(int argc, char* argv []){
         SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
 
        //invio il numero di file che arriveranno al collector
-        int lungh_lista=listLength(risultato_da_inviare.lista);
+        int lungh_lista=listLength(risultato_da_inviare->lista);
 
         //trasformiamo int in char
         char* charValue= malloc(sizeof (char)*(UNIX_PATH_MAX));
@@ -403,26 +403,25 @@ int main(int argc, char* argv []){
 
         //invio tutti i file al collector
         for(int indice=0; indice<lungh_lista;indice++){
-            write(sockfd,risultato_da_inviare.lista->opzione, strlen(risultato_da_inviare.lista->opzione)+1);
-           // printf("FILE SEND: %s\n",risultato_da_inviare.lista->opzione);
+            write(sockfd,risultato_da_inviare->lista->opzione, strlen(risultato_da_inviare->lista->opzione)+1);
+            printf("FILE SENT: %s\n",risultato_da_inviare->lista->opzione);
             sleep(1);
-            risultato_da_inviare.lista=risultato_da_inviare.lista->next;
+            risultato_da_inviare->lista=risultato_da_inviare->lista->next;
         }
 
         close(sockfd);
 
         //libero memoria usata
         free(charValue);
-        linked_list_destroy(risultato_da_inviare.lista);
         deleteQueue(q);
         free(th);
         free(thARGS);
     }
 
+    deleteData(risultato_da_inviare);
 
     pthread_kill(sighandler_thread,SIGTERM);
     pthread_join(sighandler_thread,NULL);
 
-   // printf("fine main\n\n");
     return 0;
 }

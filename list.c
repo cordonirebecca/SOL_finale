@@ -434,3 +434,12 @@ void removeChar(char * str, char charToRemmove){
     }
 }
 
+void deleteData(DATA *element){
+    while(element->lista != NULL) {
+        struct llist *p = (llist *) element->lista;
+        element->lista = element->lista->next;
+        free(p->opzione);
+        free(p);
+    }
+    free(element);
+}

@@ -80,7 +80,7 @@ void* socket_collector(void *arg){
 
     for(int indice = 0; indice<lungh_lista; indice++){
         read(connfd,buffer2,BUFSIZE);
-       // printf("\nFILE RCV: %s\n",buffer2);
+        printf("\nFILE RCVD: %s\n",buffer2);
         //inserisco nella lista tutti i file ricevuti
         if(strcmp(buffer2,"STOP") != 0){
             insert_list(&lista_ricevente,buffer2);
