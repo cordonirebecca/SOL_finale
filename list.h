@@ -24,6 +24,14 @@ typedef struct Queue {
     pthread_cond_t  qcond;
 } Queue_t;
 
+typedef struct QueueSocket {
+    llist *head;
+    llist *tail;
+    unsigned long  qlen;
+    pthread_mutex_t Slock;
+    pthread_cond_t Scond;
+}QueueSocket_t;
+
 typedef struct list_integer{
     long info;
     struct list_integer *next;
@@ -39,6 +47,7 @@ typedef struct threadArgs {
     int      thid;
     Queue_t *q;
     llist *l;
+    QueueSocket_t *Q;
     struct sockaddr_un *serv_addr;
     int lenght_tail_list;
     int tempo_di_invio;
@@ -105,5 +114,14 @@ void file_list_destroy(file_structure *head);
 void removeChar(char * str, char charToRemmove);
 
 void deleteData(DATA *element);
+
+
+QueueSocket_t *initQueueSocket();
+
+void StampaQueueSocket(QueueSocket_t *Q);
+
+void pushQueueSocket(QueueSocket_t *Q, void *data);
+
+char *dequeueSocket(QueueSocket_t *Q);
 
 #endif //SOL_LIST_H

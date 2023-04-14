@@ -16,6 +16,7 @@
 #define UNIX_PATH_MAX 256
 #include "list.h"
 #include "collector.h"
+#define MSGSIZE 16
 
 #define ec_null(s,m) \
     if((s)== 0) {perror(m); exit(EXIT_FAILURE); \
@@ -33,6 +34,29 @@ llist *List_to_insert;
 int termina=0;
 int termina_prima= 0;
 DATA *risultato_da_inviare;
+
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  cond  = PTHREAD_COND_INITIALIZER;
+int buffer;       // risorsa condivisa (buffer di una sola posizione)
+static char bufempty=1;  // flag che indica se il buffer e' vuoto
+
+#define LOCK(l)      if (pthread_mutex_lock(l)!=0)        { \
+    fprintf(stderr, "ERRORE FATALE lock\n");		    \
+    pthread_exit((void*)EXIT_FAILURE);			    \
+  }
+#define UNLOCK(l)    if (pthread_mutex_unlock(l)!=0)      { \
+  fprintf(stderr, "ERRORE FATALE unlock\n");		    \
+  pthread_exit((void*)EXIT_FAILURE);				    \
+  }
+#define WAIT(c,l)    if (pthread_cond_wait(c,l)!=0)       { \
+    fprintf(stderr, "ERRORE FATALE wait\n");		    \
+    pthread_exit((void*)EXIT_FAILURE);				    \
+}
+#define SIGNAL(c)    if (pthread_cond_signal(c)!=0)       {	\
+    fprintf(stderr, "ERRORE FATALE signal\n");			\
+    pthread_exit((void*)EXIT_FAILURE);					\
+  }
+
 
 // funzione eseguita dal signal handler thread
 static void *sigHandler_func(void *arg) {
@@ -54,7 +78,7 @@ static void *sigHandler_func(void *arg) {
             case SIGTERM:
             case SIGQUIT:
                 termina = 1;
-                printf("segnale modificato: %d\n",termina);
+             //   printf("segnale modificato: %d\n",termina);
 
                 return NULL;
             case SIGUSR1:
@@ -84,7 +108,7 @@ void *Producer(void *arg) {
         if(termina == 0){ // inserisco tutto tranquillamente
             //estraggo una alla volta i data dalla lista e li inserisco in modo concorrente in q
             data=l->opzione;
-            printf("DATA [%d]: %s\n\n",i,data);
+          //  printf("DATA [%d]: %s\n\n",i,data);
             sleep(t/1000);
             if (push(q, data) == -1) {
                 fprintf(stderr, "Errore: push\n");
@@ -169,18 +193,64 @@ void *Consumer(void *arg) {
         }
 
         ++consumed;
-        //printf("Consumer %d: estratto <%s>\n", myid, data);
-        insert_list(&risultato_da_inviare->lista,path_socket);
-       // print_list(risultato_da_inviare->lista);
 
+        printf("PATH SOCKET : %s\n\n",path_socket);
+        //invio ogni path socket singolo al mio masterWorker con la pipe
+        //lui se li salva in una coda condivisa col collector
+        //appena c'è un elemento nella coda il collector se lo prende
+
+        LOCK(&mutex);
+        while(!bufempty) {
+            WAIT(&cond, &mutex);
+        }
+
+
+        buffer = 900;
+        bufempty = 0;
+
+        SIGNAL(&cond);
+        UNLOCK(&mutex);
+
+        printf("Producer exits\n");
+
+    // produco un valore speciale per provocare la terminazione
+    // del consumatore
+/*    LOCK(&mutex);
+    while(!bufempty)
+        WAIT(&cond,&mutex);
+
+    buffer = -1;    // suppongo che non ci possano essere numeri negativi
+    bufempty = 0;
+
+    SIGNAL(&cond);
+    UNLOCK(&mutex);
+*/
     }while(1);
 
-    free(path_socket);
     free(aus);
     linked_list_destroy(l);
+    return NULL;
+}
+
+void* MasterWorker(void*arg){
+    int val=0;
+    while(val>=0) {   // suppongo che i valori siano tutti positivi o nulli
+        LOCK(&mutex);
+        while(bufempty)
+            WAIT(&cond,&mutex);
+
+        val = buffer;
+        bufempty = 1;
+        SIGNAL(&cond);
+        UNLOCK(&mutex);
+
+        printf("Consumer:   %d\n", val);
+    }
+    printf("Consumer exits\n");
 
     return NULL;
 }
+
 
 //comandi del parser
 void *parser(int argc, char*argv[],llist **List_to_insert){
@@ -223,6 +293,8 @@ int main(int argc, char* argv []){
 
     llist *List_to_insert=NULL;
     llist *List_to_send=NULL;
+    llist *list_prova=NULL;
+
     // gestione parser
     parser(argc, argv, &List_to_insert);  //list_to_insert contiene i file che erano nella riga di comando
 
@@ -264,12 +336,12 @@ int main(int argc, char* argv []){
         abort();
     }
 
-
 ///////////////////////////////////////////////////////////////////////////////////
     int p=1,c=numberThreads; //il produttore è uno solo, il masterWorker
     pthread_t    *th;
     threadArgs_t *thARGS;
     pthread_t t1;
+    pthread_t *t2;
     struct sockaddr_un serv_addr;
     int sockfd;
     memset(&serv_addr, '0', sizeof(serv_addr));
@@ -295,7 +367,6 @@ int main(int argc, char* argv []){
         exit(errno);
     }
 
-
     //argomenti per produtttore
     for(int i=0;i<p; ++i) {
         thARGS[i].thid = i;
@@ -304,6 +375,7 @@ int main(int argc, char* argv []){
         thARGS[i].lenght_tail_list=lenght_of_list;
         thARGS[i].serv_addr = &serv_addr;
         thARGS[i].tempo_di_invio=tempo;
+
     }
 
     //argomenti per consumatore
@@ -313,7 +385,10 @@ int main(int argc, char* argv []){
         thARGS[i].lenght_tail_list=lenght_of_list;
         thARGS[i].serv_addr = &serv_addr;
         thARGS[i].l = List_to_send;
+
+
     }
+
 
     pid_t process_id = fork(); //creo collector, processo figlio del masterWorker
     if(process_id == -1){
@@ -336,7 +411,6 @@ int main(int argc, char* argv []){
         sigaction(SIGUSR1,&s,NULL);
         sigaction(SIGPIPE,&s,NULL);
 
-
         //socket del collector
         for(int i=0;i<p; ++i){
             if(pthread_create(&t1,NULL,socket_collector,&thARGS[i])!= 0){
@@ -345,7 +419,7 @@ int main(int argc, char* argv []){
             }
         }
 
-      //  printf("fine collector nel main \n\n");
+        //  printf("fine collector nel main \n\n");
 
         pthread_join(t1,NULL);//collector
 
@@ -357,12 +431,34 @@ int main(int argc, char* argv []){
     }
     else{ //processo padre = masterWorker
 
+        //apro subito la connessione col collector
+
+        SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
+        int notused;
+
+        while (connect(sockfd,(struct sockaddr*)&serv_addr,sizeof(serv_addr)) == -1 ) {
+            if ( errno == ENOENT )
+                sleep(1); /* sock non esiste */
+            else exit(EXIT_FAILURE);
+        }
+       // SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
+
+       //creo il masterWorker
+       for(int i = 0; i<p; i++){
+           if (pthread_create(&t2, NULL, MasterWorker, NULL) != 0) {
+               fprintf(stderr, "pthread_create failed (MasterWorker)\n");
+               exit(EXIT_FAILURE);
+           }
+       }
+
+       //creo consumer che sono i workers
         for(int i=0;i<c; ++i)
             if (pthread_create(&th[p+i], NULL, Consumer, &thARGS[p+i]) != 0) {
                 fprintf(stderr, "pthread_create failed (Consumer)\n");
                 exit(EXIT_FAILURE);
             }
 
+        //creo il producer, il processo che inserisce in coda gli elementi
         for(int i=0;i<p; ++i)
             if (pthread_create(&th[i], NULL, Producer, &thARGS[i]) != 0) {
                 fprintf(stderr, "pthread_create failed (Producer)\n");
@@ -370,8 +466,9 @@ int main(int argc, char* argv []){
             }
 
         // aspetto prima tutti i produttori
-        for(int i=0;i<p; ++i)
+        for(int i=0;i<p; ++i){
             pthread_join(th[i], NULL);
+        }
 
         // quindi termino tutti i consumatori/workers
         for(int i=0;i<c; ++i) {
@@ -383,36 +480,19 @@ int main(int argc, char* argv []){
             pthread_join(th[p+i], NULL);
         }
 
-        //print_list(risultato_da_inviare.lista);
-
-        SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
-        int notused;
-        SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
-
-       //invio il numero di file che arriveranno al collector
-        int lungh_lista=listLength(risultato_da_inviare->lista);
-
-        //trasformiamo int in char
-        char* charValue= malloc(sizeof (char)*(UNIX_PATH_MAX));
-        sprintf(charValue,"%d",lungh_lista);
-
-        //inviamo la lunghezza della lista al collector
-        write(sockfd,charValue, strlen(charValue)+1);
-        sleep(1);
-
-
-        //invio tutti i file al collector
-        for(int indice=0; indice<lungh_lista;indice++){
-            write(sockfd,risultato_da_inviare->lista->opzione, strlen(risultato_da_inviare->lista->opzione)+1);
-            printf("FILE SENT: %s\n",risultato_da_inviare->lista->opzione);
-            sleep(1);
-            risultato_da_inviare->lista=risultato_da_inviare->lista->next;
+        //termino il MAsterWorker
+        for(int i=0;i<p; ++i){
+            pthread_join(t2, NULL);
         }
+
+
+        //inviamo ciao al collector
+        write(sockfd,"ciao", 5);
+        sleep(1);
 
         close(sockfd);
 
         //libero memoria usata
-        free(charValue);
         deleteQueue(q);
         free(th);
         free(thARGS);

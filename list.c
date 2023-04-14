@@ -15,6 +15,109 @@
 
 static inline void freeNode(llist *node)           { free((void*)node); }
 
+
+QueueSocket_t *initQueueSocket(){
+    QueueSocket_t *Q = malloc(sizeof(QueueSocket_t));
+    if(!Q){
+        return NULL;
+    }
+    Q->head = malloc(sizeof(llist));
+    if (!Q->head) {
+        return NULL;
+    }
+    Q->head->opzione = NULL;
+    Q->head->next = NULL;
+    Q->tail = Q->head;
+    Q->qlen = 0;
+    if (pthread_mutex_init(&Q->Slock, NULL) != 0) {
+        perror("mutex init");
+        return NULL;
+    }
+    if (pthread_cond_init(&Q->Scond, NULL) != 0) {
+        perror("mutex cond");
+        if (&Q->Slock) pthread_mutex_destroy(&Q->Slock);
+        return NULL;
+    }
+    return Q;
+}
+
+void StampaQueueSocket(QueueSocket_t *Q){
+    llist *temp = Q->head;
+    printf("Lista della codona :");
+    while (temp != NULL){
+        printf(" %s -> ", temp->opzione);
+        temp = temp->next;
+    }
+    printf("\n");
+}
+
+void pushQueueSocket(QueueSocket_t *Q, void *data){
+    struct llist * new= (llist *) malloc(sizeof (llist));
+    new->next=NULL;
+    int len = strlen(data)+1;
+    new->opzione=(char *) malloc(len* sizeof (char));
+    struct llist *nodoCorrente = Q->head;
+    strncpy(new->opzione,data, len);
+    if(Q->head == NULL){
+        Q->head = new;
+        return;
+    }
+    else{
+        while(nodoCorrente->next != NULL){
+            nodoCorrente=nodoCorrente->next;
+        }
+    }
+    nodoCorrente->next=new;
+    //mando segnale che c'è un valore in lista
+    if (pthread_cond_signal(&Q->Scond)!=0){
+        fprintf(stderr, "ERRORE FATALE signal\n");
+        pthread_exit((void*)EXIT_FAILURE);
+    }
+    //sblocco queue
+    if (pthread_mutex_unlock(&Q->Slock)!=0){
+        fprintf(stderr, "ERRORE FATALE unlock\n");
+        pthread_exit((void*)EXIT_FAILURE);
+    }
+}
+
+//elimino primo elemento in coda e masterWorker se lo prende e lo invia al collector
+char *dequeueSocket(QueueSocket_t *Q) {
+    if (Q == NULL) {
+        errno= EINVAL;
+        return NULL;
+    }
+    //blocco coda
+    if (pthread_mutex_lock(&Q->Slock)!=0){
+        fprintf(stderr, "ERRORE FATALE lock\n");
+        pthread_exit((void*)EXIT_FAILURE);
+    }
+    //finchè è vuota
+    while(Q->head == Q->tail) {
+        //unlock queue and wait
+        if (pthread_cond_wait(&Q->Scond, &Q->Slock) != 0) {
+            fprintf(stderr, "ERRORE FATALE wait\n");
+            pthread_exit((void *) EXIT_FAILURE);
+        }
+    }
+    //qui è tutto bloccato
+    assert(Q->head->next);
+    llist *n  = (llist *)Q->head;
+    void *data = (Q->head->next)->opzione;
+    Q->head    = Q->head->next;
+    Q->qlen   -= 1;
+    assert(Q->qlen>=0);
+    //unlock queue
+    if (pthread_mutex_unlock(&Q->Slock)!=0){
+        fprintf(stderr, "ERRORE FATALE unlock\n");
+        pthread_exit((void*)EXIT_FAILURE);
+    }
+    //libero lo spazio
+    freeNode(n);
+    return data;
+}
+
+
+
 //funzioni gestione queue
 
 Queue_t *initQueue() {

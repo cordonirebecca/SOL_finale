@@ -75,30 +75,7 @@ void* socket_collector(void *arg){
 
     //ricevo lunghezza della lista
     read(connfd,buffer,BUFSIZE);
-    //converto il char ricevuto in int
-    int lungh_lista=atoi(buffer);
+    printf("CLIENT rcvd: %s\n",buffer);
 
-    for(int indice = 0; indice<lungh_lista; indice++){
-        read(connfd,buffer2,BUFSIZE);
-        printf("\nFILE RCVD: %s\n",buffer2);
-        //inserisco nella lista tutti i file ricevuti
-        if(strcmp(buffer2,"STOP") != 0){
-            insert_list(&lista_ricevente,buffer2);
-        }
-    }
-
-    close(connfd);
-    List_to_order=split_file(lista_ricevente,List_to_order);
-
-    //ordino la lista di int
-    bubbleSort(List_to_order);
-
-    //stampo lista finale e inetrrompo il ciclo
-    print_file(List_to_order);
-
-    linked_list_destroy(lista_ricevente);
-    file_list_destroy(List_to_order);
-
-  //  printf("fine collector\n\n");
     return NULL;
 }
