@@ -546,3 +546,15 @@ void deleteData(DATA *element){
     }
     free(element);
 }
+
+char* primo_elemento (llist* l){
+    if(l == NULL){
+        errno=EINVAL;
+        return NULL;
+    }
+    llist *aus=l;
+    char* data = l->opzione;
+    return data;
+}
+
+

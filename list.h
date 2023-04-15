@@ -89,6 +89,8 @@ void print_list(struct llist* head);
 
 void linked_list_destroy(llist *linked_list);
 
+char* primo_elemento (llist* l);
+
 
 
 //funzioni gestione list_integer

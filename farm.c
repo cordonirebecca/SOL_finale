@@ -38,6 +38,7 @@ DATA *risultato_da_inviare;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  cond  = PTHREAD_COND_INITIALIZER;
 int buffer;       // risorsa condivisa (buffer di una sola posizione)
+llist *buffer_aiuto;
 static char bufempty=1;  // flag che indica se il buffer e' vuoto
 
 #define LOCK(l)      if (pthread_mutex_lock(l)!=0)        { \
@@ -108,7 +109,7 @@ void *Producer(void *arg) {
         if(termina == 0){ // inserisco tutto tranquillamente
             //estraggo una alla volta i data dalla lista e li inserisco in modo concorrente in q
             data=l->opzione;
-          //  printf("DATA [%d]: %s\n\n",i,data);
+            printf("DATA [%d]: %s\n\n",i,data);
             sleep(t/1000);
             if (push(q, data) == -1) {
                 fprintf(stderr, "Errore: push\n");
@@ -132,6 +133,7 @@ void *Producer(void *arg) {
 void *Consumer(void *arg) {
     Queue_t *q  = ((threadArgs_t*)arg)->q;
     //  int   myid  = ((threadArgs_t*)arg)->thid;
+    int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
 
     char *path_socket=malloc(sizeof(char)*(UNIX_PATH_MAX));
     char *aus=malloc(sizeof(char )*(UNIX_PATH_MAX));
@@ -147,7 +149,7 @@ void *Consumer(void *arg) {
         char* data= NULL;
         //la funzione dequeue mi restituisce il primo elemento della lista con i file
         data = dequeue(q);
-        //printf("DATA IN WORKER: %s\n\n",data);
+       // printf("DATA IN WORKER: %s\n\n",data);
         assert(data);
         if (strcmp(data,"fine")== 0) {
             // free(data);
@@ -191,40 +193,23 @@ void *Consumer(void *arg) {
             strcat(path_socket, " ");
             strcat(path_socket,aus);
         }
-
         ++consumed;
 
         printf("PATH SOCKET : %s\n\n",path_socket);
-        //invio ogni path socket singolo al mio masterWorker con la pipe
-        //lui se li salva in una coda condivisa col collector
-        //appena c'è un elemento nella coda il collector se lo prende
 
+        //faccio una seconda coda condivisa in cui inserisco i path socket
         LOCK(&mutex);
-        while(!bufempty) {
-            WAIT(&cond, &mutex);
-        }
+        while(!bufempty)
+            WAIT(&cond,&mutex);
 
-
-        buffer = 900;
+        insert_list(&buffer_aiuto,path_socket);
         bufempty = 0;
+        printf("BUFEMPTY PRIMA %d\n",bufempty);
 
-        SIGNAL(&cond);
+        SIGNAL(&cond); //avvisiamo che la coda si è riempita
         UNLOCK(&mutex);
-
         printf("Producer exits\n");
 
-    // produco un valore speciale per provocare la terminazione
-    // del consumatore
-/*    LOCK(&mutex);
-    while(!bufempty)
-        WAIT(&cond,&mutex);
-
-    buffer = -1;    // suppongo che non ci possano essere numeri negativi
-    bufempty = 0;
-
-    SIGNAL(&cond);
-    UNLOCK(&mutex);
-*/
     }while(1);
 
     free(aus);
@@ -233,18 +218,32 @@ void *Consumer(void *arg) {
 }
 
 void* MasterWorker(void*arg){
-    int val=0;
-    while(val>=0) {   // suppongo che i valori siano tutti positivi o nulli
-        LOCK(&mutex);
-        while(bufempty)
-            WAIT(&cond,&mutex);
+    char* valore_da_inviare=NULL;
 
-        val = buffer;
+    while(1) {
+        LOCK(&mutex);
+        while(bufempty){
+            WAIT(&cond,&mutex);
+            printf("DENTRO WAIT\n\n");
+            break;
+        }
+
+        print_list(buffer_aiuto);
+        printf("\n\n");
+
+        valore_da_inviare= primo_elemento(buffer_aiuto);
+        if(strcmp(valore_da_inviare, "finiti")==0){
+            printf("ci entro\n\n");
+            break;
+        }
+        //elimino il primo elemento
+        delete_head_lista_piena(&buffer_aiuto,valore_da_inviare);
+
         bufempty = 1;
         SIGNAL(&cond);
         UNLOCK(&mutex);
 
-        printf("Consumer:   %d\n", val);
+        printf("Consumed:   %s\n",valore_da_inviare);
     }
     printf("Consumer exits\n");
 
@@ -385,10 +384,7 @@ int main(int argc, char* argv []){
         thARGS[i].lenght_tail_list=lenght_of_list;
         thARGS[i].serv_addr = &serv_addr;
         thARGS[i].l = List_to_send;
-
-
     }
-
 
     pid_t process_id = fork(); //creo collector, processo figlio del masterWorker
     if(process_id == -1){
@@ -480,10 +476,18 @@ int main(int argc, char* argv []){
             pthread_join(th[p+i], NULL);
         }
 
+        sleep(0.2);
+        LOCK(&mutex);
+        insert_list(&buffer_aiuto,"finiti");
+        printf("INVIO FINITI\n\n");
+        SIGNAL(&cond);
+        UNLOCK(&mutex);
+
         //termino il MAsterWorker
         for(int i=0;i<p; ++i){
             pthread_join(t2, NULL);
         }
+        printf("JOIN MASTER\n\n");
 
 
         //inviamo ciao al collector
@@ -503,5 +507,6 @@ int main(int argc, char* argv []){
     pthread_kill(sighandler_thread,SIGTERM);
     pthread_join(sighandler_thread,NULL);
 
+    printf("FINE main\n");
     return 0;
 }
