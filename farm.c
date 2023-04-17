@@ -204,10 +204,9 @@ void *Consumer(void *arg) {
 
         insert_list(&buffer_aiuto,path_socket);
         bufempty = 0;
-        printf("BUFEMPTY PRIMA %d\n",bufempty);
-
         SIGNAL(&cond); //avvisiamo che la coda si è riempita
         UNLOCK(&mutex);
+
         printf("Producer exits\n");
 
     }while(1);
@@ -224,24 +223,24 @@ void* MasterWorker(void*arg){
         LOCK(&mutex);
         while(bufempty){
             WAIT(&cond,&mutex);
-            printf("DENTRO WAIT\n\n");
-            break;
         }
 
         print_list(buffer_aiuto);
         printf("\n\n");
 
         valore_da_inviare= primo_elemento(buffer_aiuto);
-        if(strcmp(valore_da_inviare, "finiti")==0){
-            printf("ci entro\n\n");
-            break;
-        }
+        printf("VALORE DA INVIARE: %s\n\n",valore_da_inviare);
         //elimino il primo elemento
         delete_head_lista_piena(&buffer_aiuto,valore_da_inviare);
 
         bufempty = 1;
         SIGNAL(&cond);
         UNLOCK(&mutex);
+
+        if(strcmp(valore_da_inviare, "finiti")==0){
+            bufempty =0;
+            break;
+        }
 
         printf("Consumed:   %s\n",valore_da_inviare);
     }
@@ -476,9 +475,11 @@ int main(int argc, char* argv []){
             pthread_join(th[p+i], NULL);
         }
 
-        sleep(0.2);
         LOCK(&mutex);
+        while(!bufempty)
+            WAIT(&cond,&mutex);
         insert_list(&buffer_aiuto,"finiti");
+        bufempty=0;
         printf("INVIO FINITI\n\n");
         SIGNAL(&cond);
         UNLOCK(&mutex);
