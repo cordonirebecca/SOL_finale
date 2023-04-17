@@ -73,9 +73,10 @@ void* socket_collector(void *arg){
 
     SYSCALL_EXIT("accept", connfd, accept(listenfd, (struct sockaddr*)NULL ,NULL), "accept","");
 
-    //ricevo lunghezza della lista
-    read(connfd,buffer,BUFSIZE);
-    printf("CLIENT rcvd: %s\n",buffer);
+    for(int i=0; i<7;i++){
+        read(connfd,buffer,BUFSIZE);
+        printf("CLIENT rcvd: %s\n",buffer);
+    }
 
     return NULL;
 }

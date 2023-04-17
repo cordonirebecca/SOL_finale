@@ -34,6 +34,7 @@ llist *List_to_insert;
 int termina=0;
 int termina_prima= 0;
 DATA *risultato_da_inviare;
+int sockfd;
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  cond  = PTHREAD_COND_INITIALIZER;
@@ -79,7 +80,7 @@ static void *sigHandler_func(void *arg) {
             case SIGTERM:
             case SIGQUIT:
                 termina = 1;
-             //   printf("segnale modificato: %d\n",termina);
+                //   printf("segnale modificato: %d\n",termina);
 
                 return NULL;
             case SIGUSR1:
@@ -149,7 +150,7 @@ void *Consumer(void *arg) {
         char* data= NULL;
         //la funzione dequeue mi restituisce il primo elemento della lista con i file
         data = dequeue(q);
-       // printf("DATA IN WORKER: %s\n\n",data);
+        // printf("DATA IN WORKER: %s\n\n",data);
         assert(data);
         if (strcmp(data,"fine")== 0) {
             // free(data);
@@ -195,7 +196,7 @@ void *Consumer(void *arg) {
         }
         ++consumed;
 
-        printf("PATH SOCKET : %s\n\n",path_socket);
+        //printf("PATH SOCKET : %s\n\n",path_socket);
 
         //faccio una seconda coda condivisa in cui inserisco i path socket
         LOCK(&mutex);
@@ -207,7 +208,7 @@ void *Consumer(void *arg) {
         SIGNAL(&cond); //avvisiamo che la coda si è riempita
         UNLOCK(&mutex);
 
-        printf("Producer exits\n");
+       // printf("Producer exits\n");
 
     }while(1);
 
@@ -225,11 +226,11 @@ void* MasterWorker(void*arg){
             WAIT(&cond,&mutex);
         }
 
-        print_list(buffer_aiuto);
-        printf("\n\n");
+       // print_list(buffer_aiuto);
+       // printf("\n\n");
 
         valore_da_inviare= primo_elemento(buffer_aiuto);
-        printf("VALORE DA INVIARE: %s\n\n",valore_da_inviare);
+        //printf("VALORE DA INVIARE: %s\n\n",valore_da_inviare);
         //elimino il primo elemento
         delete_head_lista_piena(&buffer_aiuto,valore_da_inviare);
 
@@ -242,9 +243,12 @@ void* MasterWorker(void*arg){
             break;
         }
 
-        printf("Consumed:   %s\n",valore_da_inviare);
+       // printf("Consumed:   %s\n",valore_da_inviare);
+        //inviamo ciao al collector
+        write(sockfd,valore_da_inviare, strlen(valore_da_inviare)+1);
+
     }
-    printf("Consumer exits\n");
+    //printf("Consumer exits\n");
 
     return NULL;
 }
@@ -341,7 +345,6 @@ int main(int argc, char* argv []){
     pthread_t t1;
     pthread_t *t2;
     struct sockaddr_un serv_addr;
-    int sockfd;
     memset(&serv_addr, '0', sizeof(serv_addr));
     strncpy(serv_addr.sun_path, SOCKNAME, strlen(SOCKNAME)+1);
     serv_addr.sun_family = AF_UNIX;
@@ -436,17 +439,17 @@ int main(int argc, char* argv []){
                 sleep(1); /* sock non esiste */
             else exit(EXIT_FAILURE);
         }
-       // SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
+        // SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
 
-       //creo il masterWorker
-       for(int i = 0; i<p; i++){
-           if (pthread_create(&t2, NULL, MasterWorker, NULL) != 0) {
-               fprintf(stderr, "pthread_create failed (MasterWorker)\n");
-               exit(EXIT_FAILURE);
-           }
-       }
+        //creo il masterWorker
+        for(int i = 0; i<p; i++){
+            if (pthread_create(&t2, NULL, MasterWorker, NULL) != 0) {
+                fprintf(stderr, "pthread_create failed (MasterWorker)\n");
+                exit(EXIT_FAILURE);
+            }
+        }
 
-       //creo consumer che sono i workers
+        //creo consumer che sono i workers
         for(int i=0;i<c; ++i)
             if (pthread_create(&th[p+i], NULL, Consumer, &thARGS[p+i]) != 0) {
                 fprintf(stderr, "pthread_create failed (Consumer)\n");
@@ -480,7 +483,7 @@ int main(int argc, char* argv []){
             WAIT(&cond,&mutex);
         insert_list(&buffer_aiuto,"finiti");
         bufempty=0;
-        printf("INVIO FINITI\n\n");
+       // printf("INVIO FINITI\n\n");
         SIGNAL(&cond);
         UNLOCK(&mutex);
 
@@ -488,12 +491,8 @@ int main(int argc, char* argv []){
         for(int i=0;i<p; ++i){
             pthread_join(t2, NULL);
         }
-        printf("JOIN MASTER\n\n");
+      //  printf("JOIN MASTER\n\n");
 
-
-        //inviamo ciao al collector
-        write(sockfd,"ciao", 5);
-        sleep(1);
 
         close(sockfd);
 
