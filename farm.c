@@ -110,7 +110,7 @@ void *Producer(void *arg) {
         if(termina == 0){ // inserisco tutto tranquillamente
             //estraggo una alla volta i data dalla lista e li inserisco in modo concorrente in q
             data=l->opzione;
-            printf("DATA [%d]: %s\n\n",i,data);
+            //printf("DATA [%d]: %s\n\n",i,data);
             sleep(t/1000);
             if (push(q, data) == -1) {
                 fprintf(stderr, "Errore: push\n");
@@ -507,6 +507,5 @@ int main(int argc, char* argv []){
     pthread_kill(sighandler_thread,SIGTERM);
     pthread_join(sighandler_thread,NULL);
 
-    printf("FINE main\n");
     return 0;
 }

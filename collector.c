@@ -75,8 +75,17 @@ void* socket_collector(void *arg){
 
     for(int i=0; i<7;i++){
         read(connfd,buffer,BUFSIZE);
-        printf("CLIENT rcvd: %s\n",buffer);
+       // printf("CLIENT rcvd: %s\n",buffer);
+        insert_list(&lista_ricevente,buffer);
     }
+
+    List_to_order=split_file(lista_ricevente,List_to_order);
+
+    //ordino la lista di int
+    bubbleSort(List_to_order);
+
+    print_file(List_to_order);
+
 
     return NULL;
 }
