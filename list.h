@@ -91,6 +91,8 @@ void linked_list_destroy(llist *linked_list);
 
 char* primo_elemento (llist* l);
 
+llist *clone(llist *l);
+
 
 
 //funzioni gestione list_integer

@@ -49,9 +49,11 @@ void bubbleSort(file_structure *head){
 
 void* socket_collector(void *arg){
     struct sockaddr_un *serv_addr=((threadArgs_t*)arg)->serv_addr;
+    int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
 
     llist *lista_ricevente = NULL;
     file_structure *List_to_order= NULL;
+    file_structure *List_stamp_before = NULL;
 
     // cancello il socket file se esiste
     cleanup();
@@ -62,7 +64,6 @@ void* socket_collector(void *arg){
     SYSCALL_EXIT("socket", listenfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
     int notused;
     char buffer[BUFSIZE];
-    char buffer2[BUFSIZE];
 
     // assegno l'indirizzo al socket
     SYSCALL_EXIT("bind", notused, bind(listenfd, (struct sockaddr*)serv_addr,sizeof(*serv_addr)), "bind", "");
@@ -73,10 +74,18 @@ void* socket_collector(void *arg){
 
     SYSCALL_EXIT("accept", connfd, accept(listenfd, (struct sockaddr*)NULL ,NULL), "accept","");
 
-    for(int i=0; i<7;i++){
+    for(int i=0; i<lenght_tail_list;i++){
         read(connfd,buffer,BUFSIZE);
-       // printf("CLIENT rcvd: %s\n",buffer);
-        insert_list(&lista_ricevente,buffer);
+        printf("CLIENT rcvd: %s\n",buffer);
+        if(strchr(buffer,'F') != NULL){ // se ricevo il file con F = SIGUSR1
+            removeChar(buffer,'F');
+            List_stamp_before=split_file(lista_ricevente,List_stamp_before);
+            bubbleSort(List_stamp_before);
+            print_file(List_stamp_before);
+        }
+        if(strcmp(buffer,"STOP") != 0){ // se ricevo STOP smetto di inserire nella coda gli elementi
+            insert_list(&lista_ricevente,buffer);
+        }
     }
 
     List_to_order=split_file(lista_ricevente,List_to_order);

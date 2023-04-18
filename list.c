@@ -238,6 +238,15 @@ int push(Queue_t *q, void *data) {
 
 //funzioni gestione llist
 
+llist* clone(llist *l){
+    if(l==NULL) {
+        return NULL;
+    }
+    struct llist *temp=(struct llist *) malloc(sizeof(struct llist));
+    temp->opzione=l->opzione;
+    temp->next=clone(l->next);
+    return temp;
+}
 
 void delete_head_lista_piena(struct llist** head,char* data){
     if(*head != NULL){
@@ -552,7 +561,6 @@ char* primo_elemento (llist* l){
         errno=EINVAL;
         return NULL;
     }
-    llist *aus=l;
     char* data = l->opzione;
     return data;
 }

@@ -16,7 +16,6 @@
 #define UNIX_PATH_MAX 256
 #include "list.h"
 #include "collector.h"
-#define MSGSIZE 16
 
 #define ec_null(s,m) \
     if((s)== 0) {perror(m); exit(EXIT_FAILURE); \
@@ -32,7 +31,7 @@ pthread_t maskProducer;
 int i=0;
 llist *List_to_insert;
 int termina=0;
-int termina_prima= 0;
+int print_received = 0;
 DATA *risultato_da_inviare;
 int sockfd;
 
@@ -84,8 +83,8 @@ static void *sigHandler_func(void *arg) {
 
                 return NULL;
             case SIGUSR1:
-                termina_prima = 1;
-                //printf("segnale modificato: %d\n",termina_prima);
+                print_received = 1;
+                printf("segnale modificato: %d\n",print_received);
                 return NULL;
             default:
                 return NULL;
@@ -134,7 +133,6 @@ void *Producer(void *arg) {
 void *Consumer(void *arg) {
     Queue_t *q  = ((threadArgs_t*)arg)->q;
     //  int   myid  = ((threadArgs_t*)arg)->thid;
-    int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
 
     char *path_socket=malloc(sizeof(char)*(UNIX_PATH_MAX));
     char *aus=malloc(sizeof(char )*(UNIX_PATH_MAX));
@@ -208,7 +206,7 @@ void *Consumer(void *arg) {
         SIGNAL(&cond); //avvisiamo che la coda si è riempita
         UNLOCK(&mutex);
 
-       // printf("Producer exits\n");
+        // printf("Producer exits\n");
 
     }while(1);
 
@@ -226,8 +224,8 @@ void* MasterWorker(void*arg){
             WAIT(&cond,&mutex);
         }
 
-       // print_list(buffer_aiuto);
-       // printf("\n\n");
+        // print_list(buffer_aiuto);
+        // printf("\n\n");
 
         valore_da_inviare= primo_elemento(buffer_aiuto);
         //printf("VALORE DA INVIARE: %s\n\n",valore_da_inviare);
@@ -238,15 +236,20 @@ void* MasterWorker(void*arg){
         SIGNAL(&cond);
         UNLOCK(&mutex);
 
-        if(strcmp(valore_da_inviare, "finiti")==0){
+        if(strcmp(valore_da_inviare, "finiti")==0){ // mando segnale per dire che i valori sono esauriti
             bufempty =0;
             break;
         }
 
-       // printf("Consumed:   %s\n",valore_da_inviare);
-        //inviamo ciao al collector
-        write(sockfd,valore_da_inviare, strlen(valore_da_inviare)+1);
-
+        printf("Consumed: %s\n",valore_da_inviare);
+        if(print_received == 1){
+            strcat(valore_da_inviare,"F");
+            write(sockfd,valore_da_inviare, strlen(valore_da_inviare)+1);
+            print_received = 0;
+        }else{
+            //inviamo al collector
+            write(sockfd, valore_da_inviare, strlen(valore_da_inviare)+1);
+        }
     }
     //printf("Consumer exits\n");
 
@@ -295,7 +298,6 @@ int main(int argc, char* argv []){
 
     llist *List_to_insert=NULL;
     llist *List_to_send=NULL;
-    llist *list_prova=NULL;
 
     // gestione parser
     parser(argc, argv, &List_to_insert);  //list_to_insert contiene i file che erano nella riga di comando
@@ -306,7 +308,6 @@ int main(int argc, char* argv []){
         exit(errno);
     }
     risultato_da_inviare->lista=NULL;
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     sigset_t     mask;
@@ -343,7 +344,7 @@ int main(int argc, char* argv []){
     pthread_t    *th;
     threadArgs_t *thARGS;
     pthread_t t1;
-    pthread_t *t2;
+    pthread_t t2;
     struct sockaddr_un serv_addr;
     memset(&serv_addr, '0', sizeof(serv_addr));
     strncpy(serv_addr.sun_path, SOCKNAME, strlen(SOCKNAME)+1);
@@ -432,7 +433,6 @@ int main(int argc, char* argv []){
         //apro subito la connessione col collector
 
         SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
-        int notused;
 
         while (connect(sockfd,(struct sockaddr*)&serv_addr,sizeof(serv_addr)) == -1 ) {
             if ( errno == ENOENT )
@@ -483,7 +483,7 @@ int main(int argc, char* argv []){
             WAIT(&cond,&mutex);
         insert_list(&buffer_aiuto,"finiti");
         bufempty=0;
-       // printf("INVIO FINITI\n\n");
+        // printf("INVIO FINITI\n\n");
         SIGNAL(&cond);
         UNLOCK(&mutex);
 
@@ -491,7 +491,7 @@ int main(int argc, char* argv []){
         for(int i=0;i<p; ++i){
             pthread_join(t2, NULL);
         }
-      //  printf("JOIN MASTER\n\n");
+        //  printf("JOIN MASTER\n\n");
 
 
         close(sockfd);
