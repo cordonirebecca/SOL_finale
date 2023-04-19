@@ -4,14 +4,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <assert.h>
 #include <signal.h>
 #include <pthread.h>
 #include <sys/un.h>
 #include <sys/socket.h>
 #include <errno.h>
-#include <sys/stat.h>
 #include "workers.h"
 #define UNIX_PATH_MAX 256
 #include "list.h"
@@ -80,11 +78,10 @@ static void *sigHandler_func(void *arg) {
             case SIGQUIT:
                 termina = 1;
                 //   printf("segnale modificato: %d\n",termina);
-
                 return NULL;
             case SIGUSR1:
                 print_received = 1;
-                printf("segnale modificato: %d\n",print_received);
+                //printf("segnale modificato: %d\n",print_received);
                 return NULL;
             default:
                 return NULL;
@@ -211,6 +208,7 @@ void *Consumer(void *arg) {
     }while(1);
 
     free(aus);
+    free(path_socket);
     linked_list_destroy(l);
     return NULL;
 }
@@ -241,7 +239,7 @@ void* MasterWorker(void*arg){
             break;
         }
 
-        printf("Consumed: %s\n",valore_da_inviare);
+        //printf("Consumed: %s\n",valore_da_inviare);
         if(print_received == 1){
             strcat(valore_da_inviare,"F");
             write(sockfd,valore_da_inviare, strlen(valore_da_inviare)+1);
@@ -493,11 +491,12 @@ int main(int argc, char* argv []){
         }
         //  printf("JOIN MASTER\n\n");
 
-
         close(sockfd);
+
 
         //libero memoria usata
         deleteQueue(q);
+        linked_list_destroy(buffer_aiuto);
         free(th);
         free(thARGS);
     }

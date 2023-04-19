@@ -324,7 +324,7 @@ void insert_list(struct llist** head, char *opzione){
     struct llist *new= (llist *)malloc(sizeof(llist));
     new->next=NULL;
     int len= strlen(opzione)+1;
-    new->opzione=(char*)malloc(len* sizeof(char));
+    new->opzione=(char*)malloc(sizeof(char)* len);
     struct llist *nodoCorrente= *head;
 
     strncpy(new->opzione,opzione,len);

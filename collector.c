@@ -76,7 +76,7 @@ void* socket_collector(void *arg){
 
     for(int i=0; i<lenght_tail_list;i++){
         read(connfd,buffer,BUFSIZE);
-        printf("CLIENT rcvd: %s\n",buffer);
+        //printf("CLIENT rcvd: %s\n",buffer);
         if(strchr(buffer,'F') != NULL){ // se ricevo il file con F = SIGUSR1
             removeChar(buffer,'F');
             List_stamp_before=split_file(lista_ricevente,List_stamp_before);
@@ -89,12 +89,13 @@ void* socket_collector(void *arg){
     }
 
     List_to_order=split_file(lista_ricevente,List_to_order);
-
     //ordino la lista di int
     bubbleSort(List_to_order);
-
     print_file(List_to_order);
 
+    linked_list_destroy(lista_ricevente);
+    file_list_destroy(List_to_order);
+    file_list_destroy(List_stamp_before);
 
     return NULL;
 }
