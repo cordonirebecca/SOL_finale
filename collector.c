@@ -97,5 +97,7 @@ void* socket_collector(void *arg){
     file_list_destroy(List_to_order);
     file_list_destroy(List_stamp_before);
 
+    //printf("FINE COLLECTOR\n\n");
+
     return NULL;
 }

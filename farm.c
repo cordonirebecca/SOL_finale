@@ -30,32 +30,8 @@ int i=0;
 llist *List_to_insert;
 int termina=0;
 int print_received = 0;
-DATA *risultato_da_inviare;
 int sockfd;
-
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t  cond  = PTHREAD_COND_INITIALIZER;
-int buffer;       // risorsa condivisa (buffer di una sola posizione)
 llist *buffer_aiuto;
-static char bufempty=1;  // flag che indica se il buffer e' vuoto
-
-#define LOCK(l)      if (pthread_mutex_lock(l)!=0)        { \
-    fprintf(stderr, "ERRORE FATALE lock\n");		    \
-    pthread_exit((void*)EXIT_FAILURE);			    \
-  }
-#define UNLOCK(l)    if (pthread_mutex_unlock(l)!=0)      { \
-  fprintf(stderr, "ERRORE FATALE unlock\n");		    \
-  pthread_exit((void*)EXIT_FAILURE);				    \
-  }
-#define WAIT(c,l)    if (pthread_cond_wait(c,l)!=0)       { \
-    fprintf(stderr, "ERRORE FATALE wait\n");		    \
-    pthread_exit((void*)EXIT_FAILURE);				    \
-}
-#define SIGNAL(c)    if (pthread_cond_signal(c)!=0)       {	\
-    fprintf(stderr, "ERRORE FATALE signal\n");			\
-    pthread_exit((void*)EXIT_FAILURE);					\
-  }
-
 
 // funzione eseguita dal signal handler thread
 static void *sigHandler_func(void *arg) {
@@ -95,7 +71,7 @@ static void *sigHandler_func(void *arg) {
 void *Producer(void *arg) {
     Queue_t *q  = ((threadArgs_t*)arg)->q;
     int t = ((threadArgs_t*)arg)->tempo_di_invio;
-    // int   myid  = ((threadArgs_t*)arg)->thid;
+   // int   myid  = ((threadArgs_t*)arg)->thid;
     llist *l=((threadArgs_t*)arg)->l;
     int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
     char *data;
@@ -145,11 +121,9 @@ void *Consumer(void *arg) {
         char* data= NULL;
         //la funzione dequeue mi restituisce il primo elemento della lista con i file
         data = dequeue(q);
-        // printf("DATA IN WORKER: %s\n\n",data);
+        //printf("DATA IN WORKER: %s\n\n",data);
         assert(data);
         if (strcmp(data,"fine")== 0) {
-            // free(data);
-            //printf("entro nel break\n");
             break;
         }
         if(strcmp(data,"STOP")== 0 ){ //stampo quello che ho ricevuto fino a quel momento
@@ -191,19 +165,17 @@ void *Consumer(void *arg) {
         }
         ++consumed;
 
-        //printf("PATH SOCKET : %s\n\n",path_socket);
+        //printf("WORKERS CONSUMED : %s\n\n",path_socket);
+        if(print_received == 1){
+            strcat(path_socket,"F");
+            write(sockfd,path_socket, strlen(path_socket)+1);
+            print_received = 0;
+        }else{
+            //inviamo al collector
+            write(sockfd, path_socket, strlen(path_socket)+1);
+        }
 
-        //faccio una seconda coda condivisa in cui inserisco i path socket
-        LOCK(&mutex);
-        while(!bufempty)
-            WAIT(&cond,&mutex);
-
-        insert_list(&buffer_aiuto,path_socket);
-        bufempty = 0;
-        SIGNAL(&cond); //avvisiamo che la coda si è riempita
-        UNLOCK(&mutex);
-
-        // printf("Producer exits\n");
+        //printf("workers exits\n");
 
     }while(1);
 
@@ -212,48 +184,6 @@ void *Consumer(void *arg) {
     linked_list_destroy(l);
     return NULL;
 }
-
-void* MasterWorker(void*arg){
-    char* valore_da_inviare=NULL;
-
-    while(1) {
-        LOCK(&mutex);
-        while(bufempty){
-            WAIT(&cond,&mutex);
-        }
-
-        // print_list(buffer_aiuto);
-        // printf("\n\n");
-
-        valore_da_inviare= primo_elemento(buffer_aiuto);
-        //printf("VALORE DA INVIARE: %s\n\n",valore_da_inviare);
-        //elimino il primo elemento
-        delete_head_lista_piena(&buffer_aiuto,valore_da_inviare);
-
-        bufempty = 1;
-        SIGNAL(&cond);
-        UNLOCK(&mutex);
-
-        if(strcmp(valore_da_inviare, "finiti")==0){ // mando segnale per dire che i valori sono esauriti
-            bufempty =0;
-            break;
-        }
-
-        //printf("Consumed: %s\n",valore_da_inviare);
-        if(print_received == 1){
-            strcat(valore_da_inviare,"F");
-            write(sockfd,valore_da_inviare, strlen(valore_da_inviare)+1);
-            print_received = 0;
-        }else{
-            //inviamo al collector
-            write(sockfd, valore_da_inviare, strlen(valore_da_inviare)+1);
-        }
-    }
-    //printf("Consumer exits\n");
-
-    return NULL;
-}
-
 
 //comandi del parser
 void *parser(int argc, char*argv[],llist **List_to_insert){
@@ -300,13 +230,6 @@ int main(int argc, char* argv []){
     // gestione parser
     parser(argc, argv, &List_to_insert);  //list_to_insert contiene i file che erano nella riga di comando
 
-    risultato_da_inviare = malloc(sizeof (DATA));
-    if(!risultato_da_inviare){
-        fprintf(stderr, "malloc risultato_da_inviare fallita\n");
-        exit(errno);
-    }
-    risultato_da_inviare->lista=NULL;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     sigset_t     mask;
     sigemptyset(&mask);
@@ -342,7 +265,6 @@ int main(int argc, char* argv []){
     pthread_t    *th;
     threadArgs_t *thARGS;
     pthread_t t1;
-    pthread_t t2;
     struct sockaddr_un serv_addr;
     memset(&serv_addr, '0', sizeof(serv_addr));
     strncpy(serv_addr.sun_path, SOCKNAME, strlen(SOCKNAME)+1);
@@ -432,17 +354,12 @@ int main(int argc, char* argv []){
 
         SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
 
+       // SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
         while (connect(sockfd,(struct sockaddr*)&serv_addr,sizeof(serv_addr)) == -1 ) {
-            if ( errno == ENOENT )
-                sleep(1); /* sock non esiste */
-            else exit(EXIT_FAILURE);
-        }
-        // SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
-
-        //creo il masterWorker
-        for(int i = 0; i<p; i++){
-            if (pthread_create(&t2, NULL, MasterWorker, NULL) != 0) {
-                fprintf(stderr, "pthread_create failed (MasterWorker)\n");
+            if ( errno == ENOENT ) {
+                sleep(1);
+            }
+            else {
                 exit(EXIT_FAILURE);
             }
         }
@@ -476,35 +393,21 @@ int main(int argc, char* argv []){
             pthread_join(th[p+i], NULL);
         }
 
-        LOCK(&mutex);
-        while(!bufempty)
-            WAIT(&cond,&mutex);
-        insert_list(&buffer_aiuto,"finiti");
-        bufempty=0;
-        // printf("INVIO FINITI\n\n");
-        SIGNAL(&cond);
-        UNLOCK(&mutex);
-
-        //termino il MAsterWorker
-        for(int i=0;i<p; ++i){
-            pthread_join(t2, NULL);
-        }
-        //  printf("JOIN MASTER\n\n");
 
         close(sockfd);
 
-
         //libero memoria usata
         deleteQueue(q);
-        linked_list_destroy(buffer_aiuto);
         free(th);
         free(thARGS);
     }
 
-    deleteData(risultato_da_inviare);
+    linked_list_destroy(buffer_aiuto);
 
     pthread_kill(sighandler_thread,SIGTERM);
     pthread_join(sighandler_thread,NULL);
 
+
+    //printf("fine main\n");
     return 0;
 }

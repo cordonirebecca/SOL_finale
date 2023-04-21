@@ -11,7 +11,6 @@
 #include <stdbool.h>
 #include "list.h"
 
-
 long sommatoria(char *nome_del_file);
 
 
