@@ -71,7 +71,7 @@ static void *sigHandler_func(void *arg) {
 void *Producer(void *arg) {
     Queue_t *q  = ((threadArgs_t*)arg)->q;
     int t = ((threadArgs_t*)arg)->tempo_di_invio;
-   // int   myid  = ((threadArgs_t*)arg)->thid;
+    // int   myid  = ((threadArgs_t*)arg)->thid;
     llist *l=((threadArgs_t*)arg)->l;
     int lenght_tail_list=((threadArgs_t*)arg)->lenght_tail_list;
     char *data;
@@ -225,7 +225,6 @@ void *parser(int argc, char*argv[],llist **List_to_insert){
 int main(int argc, char* argv []){
 
     llist *List_to_insert=NULL;
-    llist *List_to_send=NULL;
 
     // gestione parser
     parser(argc, argv, &List_to_insert);  //list_to_insert contiene i file che erano nella riga di comando
@@ -306,7 +305,6 @@ int main(int argc, char* argv []){
         thARGS[i].q    = q;
         thARGS[i].lenght_tail_list=lenght_of_list;
         thARGS[i].serv_addr = &serv_addr;
-        thARGS[i].l = List_to_send;
     }
 
     pid_t process_id = fork(); //creo collector, processo figlio del masterWorker
@@ -344,9 +342,6 @@ int main(int argc, char* argv []){
 
         //libero memoria usata
         linked_list_destroy(List_to_insert);
-        deleteQueue(q);
-        free(th);
-        free(thARGS);
     }
     else{ //processo padre = masterWorker
 
@@ -354,7 +349,7 @@ int main(int argc, char* argv []){
 
         SYSCALL_EXIT("socket", sockfd, socket(AF_UNIX, SOCK_STREAM, 0), "socket","");
 
-       // SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
+        // SYSCALL_EXIT("connect", notused, connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)), "connect","");
         while (connect(sockfd,(struct sockaddr*)&serv_addr,sizeof(serv_addr)) == -1 ) {
             if ( errno == ENOENT ) {
                 sleep(1);
@@ -393,20 +388,17 @@ int main(int argc, char* argv []){
             pthread_join(th[p+i], NULL);
         }
 
-
         close(sockfd);
-
-        //libero memoria usata
-        deleteQueue(q);
-        free(th);
-        free(thARGS);
     }
 
-    linked_list_destroy(buffer_aiuto);
+
+    //libero memoria usata
+    deleteQueue(q);
+    free(th);
+    free(thARGS);
 
     pthread_kill(sighandler_thread,SIGTERM);
     pthread_join(sighandler_thread,NULL);
-
 
     //printf("fine main\n");
     return 0;

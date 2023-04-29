@@ -58,6 +58,8 @@ int push(Queue_t *q, void *data);
 
 void delete_head_lista_piena(struct llist** head,char* data);
 
+void add_list_new(struct llist** head, char*opzione);
+
 void listdir(const char *name,struct llist *l);
 
 void Look_for_file(char* filename, char* directorydipartenza, llist*l);
@@ -67,8 +69,6 @@ void insert_list(struct llist** head, char * opzione);
 void canc(llist** head);
 
 void insert_signal(llist**l,char* opzione);
-
-void add_list_flag(struct llist** head, char * opzione,char* var);
 
 int listLength(llist *head);
 

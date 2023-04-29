@@ -164,6 +164,7 @@ void delete_head_lista_piena(struct llist** head,char* data){
 void listdir(const char *name,struct llist *l){
     DIR *dir;
     struct dirent *entry;
+    int count=0;
     if (!(dir = opendir(name)))
         return;
 
@@ -176,11 +177,13 @@ void listdir(const char *name,struct llist *l){
             snprintf(path, sizeof(path), "%s/%s", name, entry->d_name);
             //printf("PATH: %s\n\n",entry->d_name);
             //printf("%*s[%s]\n", indent, "", entry->d_name);
+            count ++;
             listdir(path,l);
         } else {
             // sono uno o più file nella directory
             //qui riempio la lista che poi passo al producer
-            add_list_flag(&l,entry->d_name,"S");
+            strcat(entry->d_name,"S");
+            insert_list(&l,entry->d_name);
         }
     }
     closedir(dir);
@@ -214,6 +217,24 @@ void Look_for_file(char* filename, char* directorydipartenza,struct llist*l){
         }
     }
     closedir(dir);
+}
+
+void add_list_new(struct llist** head, char*opzione){
+    struct llist *new= (llist *)malloc(sizeof(llist));
+    new->next=NULL;
+    new->opzione =opzione;
+    struct llist *nodoCorrente= *head;
+
+    strcpy(new->opzione,opzione);
+    if(*head == NULL) {
+        *head = new;
+        return;
+    }else{
+        while(nodoCorrente->next != NULL){
+            nodoCorrente=nodoCorrente->next;
+        }
+    }
+    nodoCorrente->next=new;
 }
 
 void insert_list(struct llist** head, char *opzione){
@@ -271,25 +292,6 @@ void insert_signal(llist**l,char* opzione){
             insert_signal(&(*l)->next,opzione);
         }
     }
-}
-
-void add_list_flag(struct llist** head, char * opzione,char* var){
-    struct llist *new= malloc(sizeof(struct llist));
-    struct llist *nodoCorrente;
-
-    new->opzione=malloc(80* sizeof(char));
-    strcpy(new->opzione,opzione);
-    strcat(new->opzione,var);
-    new->next=NULL;
-    if(*head == NULL) {
-        ((*head)->opzione) = (new->opzione);
-    }else{
-        nodoCorrente=*head;
-        while(nodoCorrente->next != NULL){
-            nodoCorrente=nodoCorrente->next;
-        }
-    }
-    nodoCorrente->next=new;
 }
 
 int listLength(llist *head){
@@ -450,5 +452,4 @@ char* primo_elemento (llist* l){
     char* data = l->opzione;
     return data;
 }
-
 
