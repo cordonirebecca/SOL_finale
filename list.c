@@ -452,4 +452,3 @@ char* primo_elemento (llist* l){
     char* data = l->opzione;
     return data;
 }
-

@@ -83,7 +83,7 @@ void* socket_collector(void *arg){
             bubbleSort(List_stamp_before);
             print_file(List_stamp_before);
         }
-        if(strcmp(buffer,"STOP") != 0){ // se ricevo STOP smetto di inserire nella coda gli elementi
+        if(strcmp(buffer,"STOP") != 0){ //finchè non ricevo STOP = SIGINT...
             insert_list(&lista_ricevente,buffer);
         }
     }

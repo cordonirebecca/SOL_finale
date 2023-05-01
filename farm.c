@@ -115,7 +115,6 @@ void *Consumer(void *arg) {
 
     long sommatoria_risultato=0;
     size_t consumed=0;
-    int unavolta=0;
 
     do {
         char* data= NULL;
@@ -127,14 +126,10 @@ void *Consumer(void *arg) {
             break;
         }
         if(strcmp(data,"STOP")== 0 ){ //stampo quello che ho ricevuto fino a quel momento
-            if(unavolta == 0){
                 strncpy(path_socket,"STOP",5);
                 //printf("path socket : %s\n\n",path_socket);
-                unavolta= 1;
-            }
-            else{
+                write(sockfd, path_socket, strlen(path_socket)+1);
                 break;
-            }
         }
         else{
             //se c'è il carattere S allora attacco path
@@ -175,6 +170,8 @@ void *Consumer(void *arg) {
             write(sockfd, path_socket, strlen(path_socket)+1);
         }
 
+        //printf("DATA PRIMA FREE: %s\n\n",data);
+        free(data);
         //printf("workers exits\n");
 
     }while(1);
@@ -400,6 +397,5 @@ int main(int argc, char* argv []){
     pthread_kill(sighandler_thread,SIGTERM);
     pthread_join(sighandler_thread,NULL);
 
-    //printf("fine main\n");
     return 0;
 }
