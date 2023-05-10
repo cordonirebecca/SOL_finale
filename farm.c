@@ -58,7 +58,7 @@ static void *sigHandler_func(void *arg) {
             case SIGUSR1:
                 print_received = 1;
                 //printf("segnale modificato: %d\n",print_received);
-                return NULL;
+               break;
             default:
                 return NULL;
         }
@@ -250,12 +250,6 @@ int main(int argc, char* argv []){
         abort();
     }
 
-    pthread_t sighandler_thread;
-    if (pthread_create(&sighandler_thread, NULL, sigHandler_func, &mask) != 0) {
-        printf("errore nella creazione del signal handler thread\n");
-        abort();
-    }
-
 ///////////////////////////////////////////////////////////////////////////////////
     int p=1,c=numberThreads; //il produttore è uno solo, il masterWorker
     pthread_t    *th;
@@ -333,14 +327,18 @@ int main(int argc, char* argv []){
             }
         }
 
-        //  printf("fine collector nel main \n\n");
-
         pthread_join(t1,NULL);//collector
 
         //libero memoria usata
         linked_list_destroy(List_to_insert);
     }
     else{ //processo padre = masterWorker
+
+        pthread_t sighandler_thread;
+        if (pthread_create(&sighandler_thread, NULL, sigHandler_func, &mask) != 0) {
+            printf("errore nella creazione del signal handler thread\n");
+            abort();
+        }
 
         //apro subito la connessione col collector
 
@@ -385,17 +383,16 @@ int main(int argc, char* argv []){
             pthread_join(th[p+i], NULL);
         }
 
+        pthread_kill(sighandler_thread,SIGTERM);
+        pthread_join(sighandler_thread,NULL);
+
         close(sockfd);
     }
-
-
+    
     //libero memoria usata
     deleteQueue(q);
     free(th);
     free(thARGS);
-
-    pthread_kill(sighandler_thread,SIGTERM);
-    pthread_join(sighandler_thread,NULL);
 
     return 0;
 }

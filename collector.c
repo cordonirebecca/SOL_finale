@@ -81,7 +81,8 @@ void* socket_collector(void *arg){
             removeChar(buffer,'F');
             List_stamp_before=split_file(lista_ricevente,List_stamp_before);
             bubbleSort(List_stamp_before);
-            print_file(List_stamp_before);
+            print_file_2(List_stamp_before);
+            printf("\n");
         }
         if(strcmp(buffer,"STOP") != 0){ //finchè non ricevo STOP = SIGINT...
             insert_list(&lista_ricevente,buffer);

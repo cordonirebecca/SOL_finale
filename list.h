@@ -102,6 +102,10 @@ void print_file(file_structure* head);
 
 void file_list_destroy(file_structure *head);
 
+void file_list_destroy_temp(file_structure *head);
+
 void removeChar(char * str, char charToRemmove);
+
+void print_file_2(file_structure* head);
 
 #endif //SOL_LIST_H

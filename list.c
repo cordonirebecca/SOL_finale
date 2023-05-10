@@ -417,12 +417,31 @@ void print_file(file_structure* head){
     }
 }
 
+
+void print_file_2(file_structure* head){
+    while(head != NULL && head->next != NULL){
+        if(strcmp(head->info,head->next->info) != 0){
+            printf("%ld %s\n",head->value,head->info);
+        }
+        head=head->next;
+    }
+}
+
 void file_list_destroy(file_structure *head){
     struct file_structure *tmp;
     while(head != NULL){
         tmp=head;
         head=head->next;
         free(tmp->info);
+        free(tmp);
+    }
+}
+
+void file_list_destroy_temp(file_structure *head){
+    struct file_structure *tmp;
+    while(head != NULL){
+        tmp=head;
+        head=head->next;
         free(tmp);
     }
 }
